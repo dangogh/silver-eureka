@@ -39,3 +39,11 @@ app
 *.db-journal
 *.db-shm
 *.db-wal
+
+# TLS certificates and keys
+*.crt
+*.key
+*.pem
+*.cer
+*.p12
+*.pfx

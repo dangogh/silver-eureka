@@ -4,8 +4,10 @@ A Go web application that logs HTTP requests to an SQLite database.
 
 ## Features
 
-- HTTP server using Go's standard library
+- HTTP/HTTPS server using Go's standard library
+- TLS support with configurable certificates
 - Configurable port via environment variable or command-line flag
+- Structured JSON logging with debug level for request details
 - Logs all HTTP requests with IP address and URL to SQLite database
 - Graceful shutdown handling
 - Comprehensive test coverage
@@ -24,27 +26,52 @@ go build -o app .
 
 ### Running the Server
 
-#### Default port (8080)
+#### Default port (8080) - HTTP
 ```bash
 ./app
 ```
 
-#### Using environment variable
+#### With TLS enabled (HTTPS)
 ```bash
-PORT=9090 ./app
+# Generate self-signed certificate for testing
+./generate-cert.sh localhost
+
+# Run with TLS
+./app -tls -tls-cert=server.crt -tls-key=server.key
 ```
 
-#### Using command-line flag (highest precedence)
+#### Using environment variables
 ```bash
-./app -port=7070
+# HTTP on custom port
+PORT=9090 ./app
+
+# HTTPS with custom certificates
+export TLS_ENABLED=true
+export TLS_CERT=/path/to/server.crt
+export TLS_KEY=/path/to/server.key
+./app
+```
+
+#### Using command-line flags (highest precedence)
+```bash
+./app -port=7070 -tls -tls-cert=server.crt -tls-key=server.key
 ```
 
 ### Configuration Priority
 
-The port configuration follows this precedence order (highest to lowest):
-1. Command-line flag (`-port`)
-2. Environment variable (`PORT`)
-3. Default value (`8080`)
+Configuration follows this precedence order (highest to lowest):
+1. Command-line flags (`-port`, `-tls`, `-tls-cert`, `-tls-key`)
+2. Environment variables (`PORT`, `TLS_ENABLED`, `TLS_CERT`, `TLS_KEY`)
+3. Default values
+
+### Configuration Options
+
+| Flag | Environment Variable | Default | Description |
+|------|---------------------|---------|-------------|
+| `-port` | `PORT` | `8080` | HTTP server port |
+| `-tls` | `TLS_ENABLED` | `false` | Enable TLS/HTTPS |
+| `-tls-cert` | `TLS_CERT` | `server.crt` | Path to TLS certificate file |
+| `-tls-key` | `TLS_KEY` | `server.key` | Path to TLS private key file |
 
 ### Testing
 
@@ -65,9 +92,16 @@ The application accepts requests to any path. Each request is logged to the SQLi
 - Requested URL path
 - Timestamp
 
-Example request:
+All requests are logged in JSON format with debug-level details including headers, user agent, and more.
+
+Example HTTP request:
 ```bash
 curl http://localhost:8080/any/path
+```
+
+Example HTTPS request (with self-signed cert):
+```bash
+curl -k https://localhost:8080/any/path
 ```
 
 Response:

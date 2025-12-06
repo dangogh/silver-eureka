@@ -58,8 +58,17 @@ func run() error {
 
 	// Start the server in a goroutine
 	go func() {
-		slog.Info("Server starting", "port", cfg.Port)
-		serverErrors <- server.ListenAndServe()
+		if cfg.TLSEnabled {
+			slog.Info("Server starting with TLS",
+				"port", cfg.Port,
+				"tls_cert", cfg.TLSCert,
+				"tls_key", cfg.TLSKey,
+			)
+			serverErrors <- server.ListenAndServeTLS(cfg.TLSCert, cfg.TLSKey)
+		} else {
+			slog.Info("Server starting", "port", cfg.Port, "tls", false)
+			serverErrors <- server.ListenAndServe()
+		}
 	}()
 
 	// Channel to listen for interrupt or terminate signals

@@ -8,12 +8,24 @@ import (
 
 func TestLoad_DefaultPort(t *testing.T) {
 	os.Unsetenv("PORT")
+	os.Unsetenv("TLS_ENABLED")
+	os.Unsetenv("TLS_CERT")
+	os.Unsetenv("TLS_KEY")
 
 	fs := flag.NewFlagSet("test", flag.ContinueOnError)
 	cfg := LoadWithFlagSet(fs, []string{})
 
 	if cfg.Port != 8080 {
 		t.Errorf("Expected default port 8080, got %d", cfg.Port)
+	}
+	if cfg.TLSEnabled {
+		t.Errorf("Expected TLS disabled by default")
+	}
+	if cfg.TLSCert != "server.crt" {
+		t.Errorf("Expected default TLS cert 'server.crt', got %s", cfg.TLSCert)
+	}
+	if cfg.TLSKey != "server.key" {
+		t.Errorf("Expected default TLS key 'server.key', got %s", cfg.TLSKey)
 	}
 }
 
@@ -52,5 +64,58 @@ func TestLoad_InvalidEnvironmentVariable(t *testing.T) {
 	// Should fall back to default
 	if cfg.Port != 8080 {
 		t.Errorf("Expected default port 8080 when env is invalid, got %d", cfg.Port)
+	}
+}
+
+func TestLoad_TLS_EnvironmentVariables(t *testing.T) {
+	os.Setenv("TLS_ENABLED", "true")
+	os.Setenv("TLS_CERT", "/path/to/cert.pem")
+	os.Setenv("TLS_KEY", "/path/to/key.pem")
+	defer func() {
+		os.Unsetenv("TLS_ENABLED")
+		os.Unsetenv("TLS_CERT")
+		os.Unsetenv("TLS_KEY")
+	}()
+
+	fs := flag.NewFlagSet("test", flag.ContinueOnError)
+	cfg := LoadWithFlagSet(fs, []string{})
+
+	if !cfg.TLSEnabled {
+		t.Errorf("Expected TLS enabled from environment")
+	}
+	if cfg.TLSCert != "/path/to/cert.pem" {
+		t.Errorf("Expected TLS cert '/path/to/cert.pem', got %s", cfg.TLSCert)
+	}
+	if cfg.TLSKey != "/path/to/key.pem" {
+		t.Errorf("Expected TLS key '/path/to/key.pem', got %s", cfg.TLSKey)
+	}
+}
+
+func TestLoad_TLS_CommandLineFlags(t *testing.T) {
+	// Set environment variables to verify flags take precedence
+	os.Setenv("TLS_ENABLED", "false")
+	os.Setenv("TLS_CERT", "/env/cert.pem")
+	os.Setenv("TLS_KEY", "/env/key.pem")
+	defer func() {
+		os.Unsetenv("TLS_ENABLED")
+		os.Unsetenv("TLS_CERT")
+		os.Unsetenv("TLS_KEY")
+	}()
+
+	fs := flag.NewFlagSet("test", flag.ContinueOnError)
+	cfg := LoadWithFlagSet(fs, []string{
+		"-tls=true",
+		"-tls-cert=/flag/cert.pem",
+		"-tls-key=/flag/key.pem",
+	})
+
+	if !cfg.TLSEnabled {
+		t.Errorf("Expected TLS enabled from flag (highest precedence)")
+	}
+	if cfg.TLSCert != "/flag/cert.pem" {
+		t.Errorf("Expected TLS cert '/flag/cert.pem' from flag, got %s", cfg.TLSCert)
+	}
+	if cfg.TLSKey != "/flag/key.pem" {
+		t.Errorf("Expected TLS key '/flag/key.pem' from flag, got %s", cfg.TLSKey)
 	}
 }
