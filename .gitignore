@@ -30,3 +30,12 @@ go.work.sum
 # Editor/IDE
 # .idea/
 # .vscode/
+
+# Application binary
+app
+
+# SQLite database
+*.db
+*.db-journal
+*.db-shm
+*.db-wal
