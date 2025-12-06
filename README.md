@@ -6,7 +6,8 @@ A Go web application that logs HTTP requests to an SQLite database.
 
 - HTTP/HTTPS server using Go's standard library
 - TLS support with configurable certificates
-- Configurable port via environment variable or command-line flag
+- Automatic HTTP to HTTPS redirect when TLS is enabled
+- Configurable ports via environment variable or command-line flag
 - Structured JSON logging with debug level for request details
 - Logs all HTTP requests with IP address and URL to SQLite database
 - Graceful shutdown handling
@@ -36,8 +37,14 @@ go build -o app .
 # Generate self-signed certificate for testing
 ./generate-cert.sh localhost
 
-# Run with TLS
+# Run with TLS (automatically starts HTTP redirect server on port 8000)
 ./app -tls -tls-cert=server.crt -tls-key=server.key
+
+# Run with TLS but disable HTTP redirect
+./app -tls -tls-cert=server.crt -tls-key=server.key -http-redirect=false
+
+# Run with TLS on custom ports
+./app -tls -port=8443 -http-port=8080 -tls-cert=server.crt -tls-key=server.key
 ```
 
 #### Using environment variables
@@ -60,18 +67,33 @@ export TLS_KEY=/path/to/server.key
 ### Configuration Priority
 
 Configuration follows this precedence order (highest to lowest):
-1. Command-line flags (`-port`, `-tls`, `-tls-cert`, `-tls-key`)
-2. Environment variables (`PORT`, `TLS_ENABLED`, `TLS_CERT`, `TLS_KEY`)
+1. Command-line flags (`-port`, `-http-port`, `-tls`, `-tls-cert`, `-tls-key`, `-http-redirect`)
+2. Environment variables (`PORT`, `HTTP_PORT`, `TLS_ENABLED`, `TLS_CERT`, `TLS_KEY`, `HTTP_REDIRECT`)
 3. Default values
+
+### HTTP to HTTPS Redirect
+
+When TLS is enabled, the application automatically starts two servers:
+- **HTTPS server** on the configured port (default: 8080)
+- **HTTP redirect server** on the HTTP port (default: 8000)
+
+The HTTP server automatically redirects all requests to HTTPS with a 301 (Moved Permanently) status. Each redirect is logged in JSON format with debug and info level messages.
+
+To disable the automatic redirect and only run the HTTPS server:
+```bash
+./app -tls -http-redirect=false
+```
 
 ### Configuration Options
 
 | Flag | Environment Variable | Default | Description |
 |------|---------------------|---------|-------------|
-| `-port` | `PORT` | `8080` | HTTP server port |
+| `-port` | `PORT` | `8080` | HTTPS server port (or HTTP if TLS disabled) |
+| `-http-port` | `HTTP_PORT` | `8000` | HTTP redirect server port (when TLS enabled) |
 | `-tls` | `TLS_ENABLED` | `false` | Enable TLS/HTTPS |
 | `-tls-cert` | `TLS_CERT` | `server.crt` | Path to TLS certificate file |
 | `-tls-key` | `TLS_KEY` | `server.key` | Path to TLS private key file |
+| `-http-redirect` | `HTTP_REDIRECT` | `true` | Enable HTTP to HTTPS redirect when TLS is enabled |
 
 ### Testing
 
@@ -83,6 +105,18 @@ go test ./...
 Run tests with verbose output:
 ```bash
 go test -v ./...
+```
+
+Using Make targets:
+```bash
+# Run tests with race detection and generate coverage report
+make test
+
+# View coverage report in browser
+make cover
+
+# Clean up generated files (coverage, database, certificates)
+make clean
 ```
 
 ### API

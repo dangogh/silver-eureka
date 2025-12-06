@@ -8,15 +8,20 @@ import (
 
 func TestLoad_DefaultPort(t *testing.T) {
 	os.Unsetenv("PORT")
+	os.Unsetenv("HTTP_PORT")
 	os.Unsetenv("TLS_ENABLED")
 	os.Unsetenv("TLS_CERT")
 	os.Unsetenv("TLS_KEY")
+	os.Unsetenv("HTTP_REDIRECT")
 
 	fs := flag.NewFlagSet("test", flag.ContinueOnError)
 	cfg := LoadWithFlagSet(fs, []string{})
 
 	if cfg.Port != 8080 {
 		t.Errorf("Expected default port 8080, got %d", cfg.Port)
+	}
+	if cfg.HTTPPort != 8000 {
+		t.Errorf("Expected default HTTP port 8000, got %d", cfg.HTTPPort)
 	}
 	if cfg.TLSEnabled {
 		t.Errorf("Expected TLS disabled by default")
@@ -26,6 +31,9 @@ func TestLoad_DefaultPort(t *testing.T) {
 	}
 	if cfg.TLSKey != "server.key" {
 		t.Errorf("Expected default TLS key 'server.key', got %s", cfg.TLSKey)
+	}
+	if !cfg.HTTPRedirect {
+		t.Errorf("Expected HTTP redirect enabled by default")
 	}
 }
 
@@ -117,5 +125,46 @@ func TestLoad_TLS_CommandLineFlags(t *testing.T) {
 	}
 	if cfg.TLSKey != "/flag/key.pem" {
 		t.Errorf("Expected TLS key '/flag/key.pem' from flag, got %s", cfg.TLSKey)
+	}
+}
+
+func TestLoad_HTTPRedirect_EnvironmentVariables(t *testing.T) {
+	os.Setenv("HTTP_PORT", "9000")
+	os.Setenv("HTTP_REDIRECT", "false")
+	defer func() {
+		os.Unsetenv("HTTP_PORT")
+		os.Unsetenv("HTTP_REDIRECT")
+	}()
+
+	fs := flag.NewFlagSet("test", flag.ContinueOnError)
+	cfg := LoadWithFlagSet(fs, []string{})
+
+	if cfg.HTTPPort != 9000 {
+		t.Errorf("Expected HTTP port 9000 from environment, got %d", cfg.HTTPPort)
+	}
+	if cfg.HTTPRedirect {
+		t.Errorf("Expected HTTP redirect disabled from environment")
+	}
+}
+
+func TestLoad_HTTPRedirect_CommandLineFlags(t *testing.T) {
+	os.Setenv("HTTP_PORT", "9000")
+	os.Setenv("HTTP_REDIRECT", "true")
+	defer func() {
+		os.Unsetenv("HTTP_PORT")
+		os.Unsetenv("HTTP_REDIRECT")
+	}()
+
+	fs := flag.NewFlagSet("test", flag.ContinueOnError)
+	cfg := LoadWithFlagSet(fs, []string{
+		"-http-port=7000",
+		"-http-redirect=false",
+	})
+
+	if cfg.HTTPPort != 7000 {
+		t.Errorf("Expected HTTP port 7000 from flag (highest precedence), got %d", cfg.HTTPPort)
+	}
+	if cfg.HTTPRedirect {
+		t.Errorf("Expected HTTP redirect disabled from flag (highest precedence)")
 	}
 }
