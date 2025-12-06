@@ -74,12 +74,18 @@ func (db *DB) LogRequest(ipAddress, url string) error {
 
 // GetLogs retrieves request logs with optional limit
 func (db *DB) GetLogs(limit int) ([]RequestLog, error) {
-	query := `SELECT id, ip_address, url, timestamp FROM request_logs ORDER BY timestamp DESC`
+	var query string
+	var rows *sql.Rows
+	var err error
+
 	if limit > 0 {
-		query = fmt.Sprintf("%s LIMIT %d", query, limit)
+		query = `SELECT id, ip_address, url, timestamp FROM request_logs ORDER BY timestamp DESC LIMIT ?`
+		rows, err = db.conn.Query(query, limit)
+	} else {
+		query = `SELECT id, ip_address, url, timestamp FROM request_logs ORDER BY timestamp DESC`
+		rows, err = db.conn.Query(query)
 	}
 
-	rows, err := db.conn.Query(query)
 	if err != nil {
 		return nil, fmt.Errorf("failed to query logs: %w", err)
 	}

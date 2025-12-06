@@ -1,5 +1,5 @@
 module github.com/dangogh/silver-eureka
 
-go 1.24.10
+go 1.24
 
 require github.com/mattn/go-sqlite3 v1.14.32
