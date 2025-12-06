@@ -2,7 +2,7 @@ package handler
 
 import (
 	"fmt"
-	"log"
+	"log/slog"
 	"net/http"
 	"strings"
 
@@ -27,10 +27,29 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	// Get the full URL
 	url := r.URL.String()
 
+	// Debug log for each incoming request
+	slog.Debug("Incoming request",
+		"method", r.Method,
+		"url", url,
+		"remote_addr", r.RemoteAddr,
+		"ip_address", ipAddress,
+		"user_agent", r.UserAgent(),
+		"headers", r.Header,
+	)
+
 	// Log the request to the database
 	if err := h.db.LogRequest(ipAddress, url); err != nil {
-		log.Printf("Error logging request: %v", err)
+		slog.Error("Error logging request to database",
+			"error", err,
+			"ip_address", ipAddress,
+			"url", url,
+		)
 		// Continue serving the request even if logging fails
+	} else {
+		slog.Info("Request logged successfully",
+			"ip_address", ipAddress,
+			"url", url,
+		)
 	}
 
 	// Respond with a simple message

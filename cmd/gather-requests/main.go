@@ -3,7 +3,7 @@ package main
 import (
 	"context"
 	"fmt"
-	"log"
+	"log/slog"
 	"net/http"
 	"os"
 	"os/signal"
@@ -16,8 +16,15 @@ import (
 )
 
 func main() {
+	// Initialize structured JSON logger
+	logger := slog.New(slog.NewJSONHandler(os.Stdout, &slog.HandlerOptions{
+		Level: slog.LevelDebug,
+	}))
+	slog.SetDefault(logger)
+
 	if err := run(); err != nil {
-		log.Fatalf("Application error: %v", err)
+		slog.Error("Application error", "error", err)
+		os.Exit(1)
 	}
 }
 
@@ -32,7 +39,7 @@ func run() error {
 	}
 	defer db.Close()
 
-	log.Println("Database initialized successfully")
+	slog.Info("Database initialized successfully", "database", "requests.db")
 
 	// Create HTTP handler
 	h := handler.New(db)
@@ -51,7 +58,7 @@ func run() error {
 
 	// Start the server in a goroutine
 	go func() {
-		log.Printf("Server starting on port %d", cfg.Port)
+		slog.Info("Server starting", "port", cfg.Port)
 		serverErrors <- server.ListenAndServe()
 	}()
 
@@ -65,7 +72,7 @@ func run() error {
 		return fmt.Errorf("server error: %w", err)
 
 	case sig := <-shutdown:
-		log.Printf("Shutdown signal received: %v", sig)
+		slog.Info("Shutdown signal received", "signal", sig.String())
 
 		// Give outstanding requests a deadline for completion
 		ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
@@ -78,7 +85,7 @@ func run() error {
 			return fmt.Errorf("could not gracefully shutdown server: %w", err)
 		}
 
-		log.Println("Server stopped gracefully")
+		slog.Info("Server stopped gracefully")
 	}
 
 	return nil
