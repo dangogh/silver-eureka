@@ -28,45 +28,6 @@ func main() {
 	}
 }
 
-// createRedirectHandler creates an HTTP handler that redirects all requests to HTTPS
-func createRedirectHandler(httpsPort int) http.Handler {
-	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		// Log the redirect
-		slog.Debug("HTTP to HTTPS redirect",
-			"method", r.Method,
-			"url", r.URL.String(),
-			"remote_addr", r.RemoteAddr,
-			"user_agent", r.UserAgent(),
-		)
-
-		// Construct the HTTPS URL
-		host := r.Host
-		// If host doesn't include a port, or includes the HTTP port, update it
-		if colonIdx := len(host) - 1; colonIdx > 0 {
-			for i := len(host) - 1; i >= 0; i-- {
-				if host[i] == ':' {
-					host = host[:i]
-					break
-				}
-			}
-		}
-
-		var httpsURL string
-		if httpsPort == 443 {
-			httpsURL = fmt.Sprintf("https://%s%s", host, r.RequestURI)
-		} else {
-			httpsURL = fmt.Sprintf("https://%s:%d%s", host, httpsPort, r.RequestURI)
-		}
-
-		slog.Info("Redirecting HTTP to HTTPS",
-			"from", fmt.Sprintf("http://%s%s", r.Host, r.RequestURI),
-			"to", httpsURL,
-		)
-
-		http.Redirect(w, r, httpsURL, http.StatusMovedPermanently)
-	})
-}
-
 func run() error {
 	// Load configuration
 	cfg := config.Load()
@@ -95,44 +56,14 @@ func run() error {
 	// Channel to listen for errors coming from the listener
 	serverErrors := make(chan error, 1)
 
-	// HTTP redirect server (if TLS is enabled and redirect is enabled)
-	var httpRedirectServer *http.Server
-
-	// Start the server in a goroutine
+	// Start the HTTPS server in a goroutine
 	go func() {
-		if cfg.TLSEnabled {
-			slog.Info("HTTPS server starting",
-				"port", cfg.Port,
-				"tls_cert", cfg.TLSCert,
-				"tls_key", cfg.TLSKey,
-			)
-
-			// Start HTTP redirect server if enabled
-			if cfg.HTTPRedirect {
-				httpRedirectServer = &http.Server{
-					Addr:         fmt.Sprintf(":%d", cfg.HTTPPort),
-					Handler:      createRedirectHandler(cfg.Port),
-					ReadTimeout:  15 * time.Second,
-					WriteTimeout: 15 * time.Second,
-					IdleTimeout:  60 * time.Second,
-				}
-
-				go func() {
-					slog.Info("HTTP redirect server starting",
-						"http_port", cfg.HTTPPort,
-						"https_port", cfg.Port,
-					)
-					if err := httpRedirectServer.ListenAndServe(); err != nil && err != http.ErrServerClosed {
-						slog.Error("HTTP redirect server error", "error", err)
-					}
-				}()
-			}
-
-			serverErrors <- server.ListenAndServeTLS(cfg.TLSCert, cfg.TLSKey)
-		} else {
-			slog.Info("HTTP server starting", "port", cfg.Port, "tls", false)
-			serverErrors <- server.ListenAndServe()
-		}
+		slog.Info("HTTPS server starting",
+			"port", cfg.Port,
+			"tls_cert", cfg.TLSCert,
+			"tls_key", cfg.TLSKey,
+		)
+		serverErrors <- server.ListenAndServeTLS(cfg.TLSCert, cfg.TLSKey)
 	}()
 
 	// Channel to listen for interrupt or terminate signals
@@ -151,17 +82,7 @@ func run() error {
 		ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
 		defer cancel()
 
-		// Shutdown HTTP redirect server first if it exists
-		if httpRedirectServer != nil {
-			if err := httpRedirectServer.Shutdown(ctx); err != nil {
-				slog.Warn("HTTP redirect server shutdown error", "error", err)
-				httpRedirectServer.Close()
-			} else {
-				slog.Info("HTTP redirect server stopped gracefully")
-			}
-		}
-
-		// Attempt graceful shutdown of main server
+		// Attempt graceful shutdown
 		if err := server.Shutdown(ctx); err != nil {
 			// Force close if graceful shutdown fails
 			server.Close()

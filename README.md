@@ -1,15 +1,14 @@
 # silver-eureka
 
-A Go web application that logs HTTP requests to an SQLite database.
+A secure HTTPS-only Go web application that logs requests to an SQLite database.
 
 ## Features
 
-- HTTP/HTTPS server using Go's standard library
-- TLS support with configurable certificates
-- Automatic HTTP to HTTPS redirect when TLS is enabled
-- Configurable ports via environment variable or command-line flag
+- **HTTPS-only server** using Go's standard library
+- TLS with configurable certificates (required)
+- Default HTTPS port 443 with override via `--port` flag
 - Structured JSON logging with debug level for request details
-- Logs all HTTP requests with IP address and URL to SQLite database
+- Logs all HTTPS requests with IP address and URL to SQLite database
 - **Statistics endpoints** for analyzing logged requests:
   - Overall summary statistics
   - Statistics grouped by endpoint/URL
@@ -31,73 +30,32 @@ go build -o app .
 
 ### Running the Server
 
-#### Default port (8080) - HTTP
-```bash
-./app
-```
-
-#### With TLS enabled (HTTPS)
+#### Default HTTPS (port 443)
 ```bash
 # Generate self-signed certificate for testing
 ./generate-cert.sh localhost
 
-# Run with TLS (automatically starts HTTP redirect server on port 8000)
-./app -tls -tls-cert=server.crt -tls-key=server.key
+# Run with default HTTPS port 443
+sudo ./app
 
-# Run with TLS but disable HTTP redirect
-./app -tls -tls-cert=server.crt -tls-key=server.key -http-redirect=false
-
-# Run with TLS on custom ports
-./app -tls -port=8443 -http-port=8080 -tls-cert=server.crt -tls-key=server.key
+# Or run on a custom port (no sudo required for ports > 1024)
+./app -port=8443
 ```
 
-#### Using environment variables
+#### Custom Port
 ```bash
-# HTTP on custom port
-PORT=9090 ./app
-
-# HTTPS with custom certificates
-export TLS_ENABLED=true
-export TLS_CERT=/path/to/server.crt
-export TLS_KEY=/path/to/server.key
-./app
+./app -port=8443
 ```
 
-#### Using command-line flags (highest precedence)
-```bash
-./app -port=7070 -tls -tls-cert=server.crt -tls-key=server.key
-```
+### Configuration
 
-### Configuration Priority
+The server is HTTPS-only and requires TLS certificates. The default certificate paths are `server.crt` and `server.key` in the current directory.
 
-Configuration follows this precedence order (highest to lowest):
-1. Command-line flags (`-port`, `-http-port`, `-tls`, `-tls-cert`, `-tls-key`, `-http-redirect`)
-2. Environment variables (`PORT`, `HTTP_PORT`, `TLS_ENABLED`, `TLS_CERT`, `TLS_KEY`, `HTTP_REDIRECT`)
-3. Default values
+| Flag | Default | Description |
+|------|---------|-------------|
+| `-port` | `443` | HTTPS server port |
 
-### HTTP to HTTPS Redirect
-
-When TLS is enabled, the application automatically starts two servers:
-- **HTTPS server** on the configured port (default: 8080)
-- **HTTP redirect server** on the HTTP port (default: 8000)
-
-The HTTP server automatically redirects all requests to HTTPS with a 301 (Moved Permanently) status. Each redirect is logged in JSON format with debug and info level messages.
-
-To disable the automatic redirect and only run the HTTPS server:
-```bash
-./app -tls -http-redirect=false
-```
-
-### Configuration Options
-
-| Flag | Environment Variable | Default | Description |
-|------|---------------------|---------|-------------|
-| `-port` | `PORT` | `8080` | HTTPS server port (or HTTP if TLS disabled) |
-| `-http-port` | `HTTP_PORT` | `8000` | HTTP redirect server port (when TLS enabled) |
-| `-tls` | `TLS_ENABLED` | `false` | Enable TLS/HTTPS |
-| `-tls-cert` | `TLS_CERT` | `server.crt` | Path to TLS certificate file |
-| `-tls-key` | `TLS_KEY` | `server.key` | Path to TLS private key file |
-| `-http-redirect` | `HTTP_REDIRECT` | `true` | Enable HTTP to HTTPS redirect when TLS is enabled |
+**Note**: Port 443 requires sudo/root privileges. For development, use a port above 1024 (e.g., 8443).
 
 ### Testing
 
@@ -136,14 +94,9 @@ Any request to paths other than `/stats/*` will be logged to the database with:
 
 All requests are logged in JSON format with debug-level details including headers, user agent, and more.
 
-Example HTTP request:
+Example request (use -k for self-signed cert):
 ```bash
-curl http://localhost:8080/any/path
-```
-
-Example HTTPS request (with self-signed cert):
-```bash
-curl -k https://localhost:8080/any/path
+curl -k https://localhost/any/path
 ```
 
 Response:
@@ -157,7 +110,7 @@ The application provides three statistics endpoints that return JSON data:
 
 **GET /stats/summary** - Overall statistics
 ```bash
-curl http://localhost:8080/stats/summary
+curl -k https://localhost/stats/summary
 ```
 Response:
 ```json
@@ -172,7 +125,7 @@ Response:
 
 **GET /stats/endpoints** - Statistics grouped by endpoint/URL
 ```bash
-curl http://localhost:8080/stats/endpoints
+curl -k https://localhost/stats/endpoints
 ```
 Response:
 ```json
@@ -196,7 +149,7 @@ Response:
 
 **GET /stats/sources** - Statistics grouped by IP address/source
 ```bash
-curl http://localhost:8080/stats/sources
+curl -k https://localhost/stats/sources
 ```
 Response:
 ```json
