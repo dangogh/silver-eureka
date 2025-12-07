@@ -10,6 +10,10 @@ A Go web application that logs HTTP requests to an SQLite database.
 - Configurable ports via environment variable or command-line flag
 - Structured JSON logging with debug level for request details
 - Logs all HTTP requests with IP address and URL to SQLite database
+- **Statistics endpoints** for analyzing logged requests:
+  - Overall summary statistics
+  - Statistics grouped by endpoint/URL
+  - Statistics grouped by source IP address
 - Graceful shutdown handling
 - Comprehensive test coverage
 
@@ -121,7 +125,11 @@ make clean
 
 ### API
 
-The application accepts requests to any path. Each request is logged to the SQLite database with:
+The application provides both request logging and statistics endpoints.
+
+#### Request Logging
+
+Any request to paths other than `/stats/*` will be logged to the database with:
 - Client IP address (supports X-Forwarded-For and X-Real-IP headers)
 - Requested URL path
 - Timestamp
@@ -141,6 +149,73 @@ curl -k https://localhost:8080/any/path
 Response:
 ```
 Request logged: /any/path from 127.0.0.1
+```
+
+#### Statistics Endpoints
+
+The application provides three statistics endpoints that return JSON data:
+
+**GET /stats/summary** - Overall statistics
+```bash
+curl http://localhost:8080/stats/summary
+```
+Response:
+```json
+{
+  "total_requests": 150,
+  "unique_ips": 23,
+  "unique_urls": 45,
+  "first_request": "2025-12-06T10:00:00Z",
+  "last_request": "2025-12-06T17:30:00Z"
+}
+```
+
+**GET /stats/endpoints** - Statistics grouped by endpoint/URL
+```bash
+curl http://localhost:8080/stats/endpoints
+```
+Response:
+```json
+[
+  {
+    "url": "/api/users",
+    "count": 45,
+    "first_seen": "2025-12-06T10:00:00Z",
+    "last_seen": "2025-12-06T17:30:00Z",
+    "unique_ips": 12
+  },
+  {
+    "url": "/api/products",
+    "count": 30,
+    "first_seen": "2025-12-06T10:15:00Z",
+    "last_seen": "2025-12-06T17:25:00Z",
+    "unique_ips": 8
+  }
+]
+```
+
+**GET /stats/sources** - Statistics grouped by IP address/source
+```bash
+curl http://localhost:8080/stats/sources
+```
+Response:
+```json
+[
+  {
+    "ip_address": "192.168.1.100",
+    "count": 25,
+    "first_seen": "2025-12-06T10:00:00Z",
+    "last_seen": "2025-12-06T17:30:00Z",
+    "unique_urls": 10
+  },
+  {
+    "ip_address": "192.168.1.101",
+    "count": 18,
+    "first_seen": "2025-12-06T10:30:00Z",
+    "last_seen": "2025-12-06T17:20:00Z",
+    "unique_urls": 7
+  }
+]
 ```
 
 ## Database

@@ -12,7 +12,7 @@ import (
 
 	"github.com/dangogh/silver-eureka/internal/config"
 	"github.com/dangogh/silver-eureka/internal/database"
-	"github.com/dangogh/silver-eureka/internal/handler"
+	"github.com/dangogh/silver-eureka/internal/router"
 )
 
 func main() {
@@ -80,8 +80,8 @@ func run() error {
 
 	slog.Info("Database initialized successfully", "database", "requests.db")
 
-	// Create HTTP handler
-	h := handler.New(db)
+	// Create HTTP router with all endpoints
+	h := router.New(db)
 
 	// Create HTTP server
 	server := &http.Server{
