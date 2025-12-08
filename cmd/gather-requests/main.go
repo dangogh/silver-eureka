@@ -56,14 +56,10 @@ func run() error {
 	// Channel to listen for errors coming from the listener
 	serverErrors := make(chan error, 1)
 
-	// Start the HTTPS server in a goroutine
+	// Start the HTTP server in a goroutine
 	go func() {
-		slog.Info("HTTPS server starting",
-			"port", cfg.Port,
-			"tls_cert", cfg.TLSCert,
-			"tls_key", cfg.TLSKey,
-		)
-		serverErrors <- server.ListenAndServeTLS(cfg.TLSCert, cfg.TLSKey)
+		slog.Info("HTTP server starting", "port", cfg.Port)
+		serverErrors <- server.ListenAndServe()
 	}()
 
 	// Channel to listen for interrupt or terminate signals

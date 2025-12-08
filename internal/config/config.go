@@ -7,13 +7,11 @@ import (
 
 // Config holds the application configuration
 type Config struct {
-	Port    int
-	TLSCert string
-	TLSKey  string
+	Port int
 }
 
 // Load loads configuration from flags
-// Priority: command-line flag > default (443)
+// Priority: command-line flag > environment variable > default
 func Load() *Config {
 	return LoadWithFlagSet(flag.CommandLine, os.Args[1:])
 }
@@ -21,13 +19,11 @@ func Load() *Config {
 // LoadWithFlagSet loads configuration with a custom flag set (for testing)
 func LoadWithFlagSet(fs *flag.FlagSet, args []string) *Config {
 	cfg := &Config{
-		Port:    443, // default HTTPS port
-		TLSCert: "server.crt",
-		TLSKey:  "server.key",
+		Port: 8080, // default HTTP port
 	}
 
 	// Command-line flag for port override
-	port := fs.Int("port", cfg.Port, "HTTPS server port")
+	port := fs.Int("port", cfg.Port, "HTTP server port")
 	fs.Parse(args)
 
 	cfg.Port = *port
