@@ -17,6 +17,7 @@ func New(db *database.DB) http.Handler {
 	mux.HandleFunc("/stats/endpoints", statsHandler.HandleEndpointStats)
 	mux.HandleFunc("/stats/sources", statsHandler.HandleSourceStats)
 	mux.HandleFunc("/stats/summary", statsHandler.HandleSummary)
+	mux.HandleFunc("/stats/download", statsHandler.HandleDownload)
 
 	// Default handler for all other requests (logs them)
 	logHandler := handler.New(db)

@@ -93,3 +93,28 @@ func (h *Handler) HandleSummary(w http.ResponseWriter, r *http.Request) {
 		"unique_urls", summary.UniqueURLs,
 	)
 }
+
+// HandleDownload returns all request logs as JSON
+func (h *Handler) HandleDownload(w http.ResponseWriter, r *http.Request) {
+	slog.Debug("Download requested",
+		"method", r.Method,
+		"remote_addr", r.RemoteAddr,
+	)
+
+	logs, err := h.db.GetAllLogs()
+	if err != nil {
+		slog.Error("Failed to get all logs", "error", err)
+		http.Error(w, "Internal server error", http.StatusInternalServerError)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	w.Header().Set("Content-Disposition", "attachment; filename=\"request_logs.json\"")
+	w.WriteHeader(http.StatusOK)
+
+	if err := json.NewEncoder(w).Encode(logs); err != nil {
+		slog.Error("Failed to encode logs", "error", err)
+	}
+
+	slog.Info("Download completed", "count", len(logs))
+}

@@ -134,6 +134,11 @@ func (db *DB) GetLogs(limit int) ([]RequestLog, error) {
 	return logs, nil
 }
 
+// GetAllLogs retrieves all request logs from the database
+func (db *DB) GetAllLogs() ([]RequestLog, error) {
+	return db.GetLogs(0)
+}
+
 // Close closes the database connection
 func (db *DB) Close() error {
 	if db.conn != nil {
