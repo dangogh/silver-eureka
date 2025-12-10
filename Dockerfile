@@ -9,7 +9,7 @@ RUN go build ./cmd/gather-requests
 
 FROM alpine:3.20
 
-RUN apk --no-cache add ca-certificates sqlite3
+RUN apk --no-cache add ca-certificates sqlite
 WORKDIR /root/
 
 COPY --from=builder /app/gather-requests /usr/local/bin/
