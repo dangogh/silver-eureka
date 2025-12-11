@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
+	"strings"
 	"syscall"
 	"time"
 
@@ -32,9 +33,13 @@ func run() error {
 	// Load configuration
 	cfg := config.Load()
 
-	// Ensure data directory exists
-	if err := os.MkdirAll("data", 0755); err != nil {
-		return fmt.Errorf("failed to create data directory: %w", err)
+	// Ensure database directory exists
+	dbDir := cfg.DBPath
+	if idx := strings.LastIndex(dbDir, "/"); idx > 0 {
+		dbDir = dbDir[:idx]
+		if err := os.MkdirAll(dbDir, 0755); err != nil {
+			return fmt.Errorf("failed to create database directory: %w", err)
+		}
 	}
 
 	// Initialize database
