@@ -32,14 +32,19 @@ func run() error {
 	// Load configuration
 	cfg := config.Load()
 
+	// Ensure data directory exists
+	if err := os.MkdirAll("data", 0755); err != nil {
+		return fmt.Errorf("failed to create data directory: %w", err)
+	}
+
 	// Initialize database
-	db, err := database.New("requests.db")
+	db, err := database.New(cfg.DBPath)
 	if err != nil {
 		return fmt.Errorf("failed to initialize database: %w", err)
 	}
 	defer db.Close()
 
-	slog.Info("Database initialized successfully", "database", "requests.db")
+	slog.Info("Database initialized successfully", "database", cfg.DBPath)
 
 	// Create HTTP router with all endpoints
 	h := router.New(db)

@@ -7,7 +7,8 @@ import (
 
 // Config holds the application configuration
 type Config struct {
-	Port int
+	Port   int
+	DBPath string
 }
 
 // Load loads configuration from flags
@@ -18,15 +19,24 @@ func Load() *Config {
 
 // LoadWithFlagSet loads configuration with a custom flag set (for testing)
 func LoadWithFlagSet(fs *flag.FlagSet, args []string) *Config {
-	cfg := &Config{
-		Port: 8080, // default HTTP port
+	// Check environment variable for database path
+	dbPath := os.Getenv("DB_PATH")
+	if dbPath == "" {
+		dbPath = "data/requests.db"
 	}
 
-	// Command-line flag for port override
+	cfg := &Config{
+		Port:   8080, // default HTTP port
+		DBPath: dbPath,
+	}
+
+	// Command-line flags
 	port := fs.Int("port", cfg.Port, "HTTP server port")
+	dbPathFlag := fs.String("db", cfg.DBPath, "Database file path")
 	fs.Parse(args)
 
 	cfg.Port = *port
+	cfg.DBPath = *dbPathFlag
 
 	return cfg
 }
