@@ -28,7 +28,9 @@ func (h *Handler) HandleEndpointStats(w http.ResponseWriter, r *http.Request) {
 	stats, err := h.db.GetEndpointStats()
 	if err != nil {
 		slog.Error("Failed to get endpoint stats", "error", err)
-		http.Error(w, "Internal server error", http.StatusInternalServerError)
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusInternalServerError)
+		json.NewEncoder(w).Encode(map[string]string{"error": "failed to retrieve endpoint statistics", "details": err.Error()})
 		return
 	}
 
@@ -52,7 +54,9 @@ func (h *Handler) HandleSourceStats(w http.ResponseWriter, r *http.Request) {
 	stats, err := h.db.GetSourceStats()
 	if err != nil {
 		slog.Error("Failed to get source stats", "error", err)
-		http.Error(w, "Internal server error", http.StatusInternalServerError)
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusInternalServerError)
+		json.NewEncoder(w).Encode(map[string]string{"error": "failed to retrieve source statistics", "details": err.Error()})
 		return
 	}
 
@@ -76,7 +80,9 @@ func (h *Handler) HandleSummary(w http.ResponseWriter, r *http.Request) {
 	summary, err := h.db.GetSummary()
 	if err != nil {
 		slog.Error("Failed to get summary stats", "error", err)
-		http.Error(w, "Internal server error", http.StatusInternalServerError)
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusInternalServerError)
+		json.NewEncoder(w).Encode(map[string]string{"error": "failed to retrieve summary statistics", "details": err.Error()})
 		return
 	}
 
@@ -104,7 +110,9 @@ func (h *Handler) HandleDownload(w http.ResponseWriter, r *http.Request) {
 	logs, err := h.db.GetAllLogs()
 	if err != nil {
 		slog.Error("Failed to get all logs", "error", err)
-		http.Error(w, "Internal server error", http.StatusInternalServerError)
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusInternalServerError)
+		json.NewEncoder(w).Encode(map[string]string{"error": "failed to retrieve logs", "details": err.Error()})
 		return
 	}
 

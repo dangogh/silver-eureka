@@ -47,13 +47,17 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			"ip_address", ipAddress,
 			"url", url,
 		)
-		// Continue serving the request even if logging fails
-	} else {
-		slog.Info("Request logged successfully",
-			"ip_address", ipAddress,
-			"url", url,
-		)
+		// Graceful degradation: return error response but don't crash
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusServiceUnavailable)
+		fmt.Fprintf(w, `{"error":"logging temporarily unavailable","status":"degraded"}`)
+		return
 	}
+
+	slog.Info("Request logged successfully",
+		"ip_address", ipAddress,
+		"url", url,
+	)
 
 	// Respond with a simple message
 	w.Header().Set("Content-Type", "text/plain")
