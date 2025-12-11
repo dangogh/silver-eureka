@@ -21,6 +21,9 @@ func New(db *database.DB) *Handler {
 
 // ServeHTTP implements the http.Handler interface
 func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	// Limit request body size to 1MB to prevent memory exhaustion
+	r.Body = http.MaxBytesReader(w, r.Body, 1<<20)
+
 	// Extract IP address from request
 	ipAddress := getIPAddress(r)
 
