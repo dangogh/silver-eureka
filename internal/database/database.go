@@ -166,6 +166,14 @@ func (db *DB) Close() error {
 	return nil
 }
 
+// Ping checks if the database connection is alive
+func (db *DB) Ping() error {
+	if db.conn == nil {
+		return fmt.Errorf("database connection is nil")
+	}
+	return db.conn.Ping()
+}
+
 // GetEndpointStats retrieves statistics grouped by endpoint/URL
 func (db *DB) GetEndpointStats() ([]EndpointStats, error) {
 	query := `

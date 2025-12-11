@@ -11,7 +11,7 @@ RUN CGO_ENABLED=1 go build ./cmd/gather-requests
 
 FROM alpine:3.20
 
-RUN apk --no-cache add ca-certificates sqlite
+RUN apk --no-cache add ca-certificates sqlite wget
 WORKDIR /root/
 
 COPY --from=builder /app/gather-requests /root/bin/
