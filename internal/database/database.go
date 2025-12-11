@@ -74,6 +74,22 @@ func New(dbPath string) (*DB, error) {
 
 // initSchema creates the necessary tables if they don't exist
 func (db *DB) initSchema() error {
+	// Configure SQLite for better performance
+	pragmas := `
+	PRAGMA journal_mode = WAL;
+	PRAGMA synchronous = NORMAL;
+	PRAGMA cache_size = -64000;
+	PRAGMA busy_timeout = 5000;
+	`
+	if _, err := db.conn.Exec(pragmas); err != nil {
+		return fmt.Errorf("failed to set pragmas: %w", err)
+	}
+
+	// Set connection pool limits
+	db.conn.SetMaxOpenConns(1) // SQLite only supports one writer
+	db.conn.SetMaxIdleConns(1)
+	db.conn.SetConnMaxLifetime(0)
+
 	query := `
 	CREATE TABLE IF NOT EXISTS request_logs (
 		id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -83,6 +99,7 @@ func (db *DB) initSchema() error {
 	);
 	CREATE INDEX IF NOT EXISTS idx_timestamp ON request_logs(timestamp);
 	CREATE INDEX IF NOT EXISTS idx_ip_address ON request_logs(ip_address);
+	CREATE INDEX IF NOT EXISTS idx_url ON request_logs(url);
 	`
 
 	_, err := db.conn.Exec(query)
@@ -134,9 +151,11 @@ func (db *DB) GetLogs(limit int) ([]RequestLog, error) {
 	return logs, nil
 }
 
-// GetAllLogs retrieves all request logs from the database
+// GetAllLogs retrieves all request logs from the database with a safety limit
 func (db *DB) GetAllLogs() ([]RequestLog, error) {
-	return db.GetLogs(0)
+	// Limit to 100k records to prevent memory exhaustion
+	// For larger exports, implement pagination or streaming
+	return db.GetLogs(100000)
 }
 
 // Close closes the database connection
