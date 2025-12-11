@@ -5,7 +5,8 @@ COPY go.mod go.sum ./
 RUN go mod download
 COPY . .
 
-RUN go build ./cmd/gather-requests
+# CGO_ENABLED=1 is set to enable cgo for SQLite support
+RUN CGO_ENABLED=1 go build ./cmd/gather-requests
 
 FROM alpine:3.20
 
