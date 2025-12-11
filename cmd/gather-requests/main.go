@@ -54,13 +54,15 @@ func run() error {
 	// Create HTTP router with all endpoints
 	h := router.New(db)
 
-	// Create HTTP server
+	// Create HTTP server with concurrency-friendly settings
 	server := &http.Server{
-		Addr:         fmt.Sprintf(":%d", cfg.Port),
-		Handler:      h,
-		ReadTimeout:  15 * time.Second,
-		WriteTimeout: 15 * time.Second,
-		IdleTimeout:  60 * time.Second,
+		Addr:              fmt.Sprintf(":%d", cfg.Port),
+		Handler:           h,
+		ReadTimeout:       15 * time.Second,
+		WriteTimeout:      15 * time.Second,
+		IdleTimeout:       60 * time.Second,
+		ReadHeaderTimeout: 5 * time.Second,
+		MaxHeaderBytes:    1 << 20, // 1MB
 	}
 
 	// Channel to listen for errors coming from the listener

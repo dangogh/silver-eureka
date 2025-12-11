@@ -3,6 +3,7 @@ package database
 import (
 	"database/sql"
 	"fmt"
+	"strings"
 	"time"
 
 	_ "github.com/mattn/go-sqlite3"
@@ -74,21 +75,24 @@ func New(dbPath string) (*DB, error) {
 
 // initSchema creates the necessary tables if they don't exist
 func (db *DB) initSchema() error {
-	// Configure SQLite for better performance
+	// Configure SQLite for better performance and concurrency
 	pragmas := `
 	PRAGMA journal_mode = WAL;
 	PRAGMA synchronous = NORMAL;
 	PRAGMA cache_size = -64000;
-	PRAGMA busy_timeout = 5000;
+	PRAGMA busy_timeout = 10000;
+	PRAGMA wal_autocheckpoint = 1000;
 	`
 	if _, err := db.conn.Exec(pragmas); err != nil {
 		return fmt.Errorf("failed to set pragmas: %w", err)
 	}
 
-	// Set connection pool limits
-	db.conn.SetMaxOpenConns(1) // SQLite only supports one writer
-	db.conn.SetMaxIdleConns(1)
-	db.conn.SetConnMaxLifetime(0)
+	// Set connection pool limits for concurrent operations
+	// WAL mode allows multiple concurrent readers with one writer
+	db.conn.SetMaxOpenConns(25)                 // Allow up to 25 concurrent connections
+	db.conn.SetMaxIdleConns(10)                 // Keep 10 idle connections for fast reuse
+	db.conn.SetConnMaxLifetime(0)               // Connections don't expire
+	db.conn.SetConnMaxIdleTime(time.Minute * 5) // Close idle connections after 5 min
 
 	query := `
 	CREATE TABLE IF NOT EXISTS request_logs (
@@ -106,14 +110,43 @@ func (db *DB) initSchema() error {
 	return err
 }
 
-// LogRequest logs an HTTP request to the database
+// LogRequest logs an HTTP request to the database with retry logic
 func (db *DB) LogRequest(ipAddress, url string) error {
 	query := `INSERT INTO request_logs (ip_address, url, timestamp) VALUES (?, ?, ?)`
-	_, err := db.conn.Exec(query, ipAddress, url, time.Now())
-	if err != nil {
-		return fmt.Errorf("failed to log request: %w", err)
+
+	// Retry with exponential backoff for database lock contention
+	maxRetries := 3
+	for attempt := 0; attempt <= maxRetries; attempt++ {
+		_, err := db.conn.Exec(query, ipAddress, url, time.Now())
+		if err == nil {
+			return nil
+		}
+
+		// Check if it's a retryable error (database locked)
+		if !isRetryableError(err) {
+			return fmt.Errorf("failed to log request: %w", err)
+		}
+
+		// Don't sleep on the last attempt
+		if attempt < maxRetries {
+			// Exponential backoff: 10ms, 20ms, 40ms
+			backoff := time.Millisecond * time.Duration(10*(1<<uint(attempt)))
+			time.Sleep(backoff)
+		}
 	}
-	return nil
+
+	return fmt.Errorf("failed to log request after %d retries", maxRetries)
+}
+
+// isRetryableError checks if an error is retryable (e.g., database locked)
+func isRetryableError(err error) bool {
+	if err == nil {
+		return false
+	}
+	errStr := err.Error()
+	return strings.Contains(errStr, "database is locked") ||
+		strings.Contains(errStr, "database table is locked") ||
+		strings.Contains(errStr, "SQLITE_BUSY")
 }
 
 // GetLogs retrieves request logs with optional limit
