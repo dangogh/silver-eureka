@@ -1,0 +1,11 @@
+services:
+  gather-requests:
+    build: .
+    ports:
+      - "8080:8080"
+    volumes:
+      - ./data:/root/data
+    environment:
+      - PORT=8080
+    command: ["/root/bin/gather-requests", "-port=8080"]
+    restart: unless-stopped

@@ -1,6 +1,7 @@
-FROM golang:1.25-alpine as builder
+FROM golang:1.25-alpine AS builder
 WORKDIR /app
 
+RUN apk add --no-cache build-base gcc sqlite
 COPY go.mod go.sum ./
 RUN go mod download
 COPY . .
