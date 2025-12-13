@@ -11,8 +11,14 @@ RUN CGO_ENABLED=1 go build ./cmd/gather-requests
 
 FROM alpine:3.20
 
-RUN apk --no-cache add ca-certificates sqlite wget
-WORKDIR /root/
+RUN apk --no-cache add ca-certificates sqlite wget && \
+    addgroup -g 1000 appuser && \
+    adduser -D -u 1000 -G appuser appuser
 
-COPY --from=builder /app/gather-requests /root/bin/
-CMD ["gather-requests"]
+WORKDIR /home/appuser
+
+COPY --from=builder /app/gather-requests /home/appuser/bin/gather-requests
+RUN chown -R appuser:appuser /home/appuser
+
+USER appuser
+CMD ["bin/gather-requests"]

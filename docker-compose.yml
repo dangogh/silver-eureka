@@ -4,9 +4,9 @@ services:
     ports:
       - "8080:8080"
     volumes:
-      - ./data:/root/data
+      - ./data:/home/appuser/data
     environment:
-      - DB_PATH=/root/data/requests.db
+      - DB_PATH=/home/appuser/data/requests.db
       # Uncomment and set these to enable HTTP Basic Auth for /stats/* endpoints
       # - AUTH_USERNAME=admin
       # - AUTH_PASSWORD=changeme
