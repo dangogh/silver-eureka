@@ -72,8 +72,9 @@ func (h *Handler) HandleLoginSubmit(w http.ResponseWriter, r *http.Request) {
 
 	if !userMatch || !passMatch {
 		time.Sleep(100 * time.Millisecond) // Prevent timing attacks
-		w.Header().Set("Content-Type", "text/html; charset=utf-8")
-		h.templates.ExecuteTemplate(w, "login.html", map[string]string{"Error": "Invalid credentials"})
+		w.Header().Set("Content-Type", "text/plain")
+		w.WriteHeader(http.StatusUnauthorized)
+		w.Write([]byte("401 unauthorized\n"))
 		return
 	}
 
@@ -178,18 +179,56 @@ func (h *Handler) HandleStatsView(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
+// getIPAddress extracts the client IP address from the request
+func getIPAddress(r *http.Request) string {
+	// Check X-Forwarded-For header first (for proxied requests)
+	if xff := r.Header.Get("X-Forwarded-For"); xff != "" {
+		// X-Forwarded-For can contain multiple IPs; take the first one
+		if idx := len(xff); idx > 0 {
+			if commaIdx := 0; commaIdx < idx {
+				for i, c := range xff {
+					if c == ',' {
+						return xff[:i]
+					}
+				}
+			}
+			return xff
+		}
+	}
+
+	// Check X-Real-IP header
+	if xri := r.Header.Get("X-Real-IP"); xri != "" {
+		return xri
+	}
+
+	// Fall back to RemoteAddr
+	return r.RemoteAddr
+}
+
 // RequireAuth is middleware that ensures user is authenticated
 func (h *Handler) RequireAuth(next http.HandlerFunc) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		cookie, err := r.Cookie(sessionCookieName)
 		if err != nil {
-			http.Redirect(w, r, "/login", http.StatusSeeOther)
+			// Log the request before returning 404
+			if err := h.db.LogRequest(getIPAddress(r), r.URL.Path); err != nil {
+				slog.Error("Failed to log request", "error", err)
+			}
+			w.Header().Set("Content-Type", "text/plain")
+			w.WriteHeader(http.StatusNotFound)
+			w.Write([]byte("404 page not found\n"))
 			return
 		}
 
 		_, ok := h.sessions.Get(cookie.Value)
 		if !ok {
-			http.Redirect(w, r, "/login", http.StatusSeeOther)
+			// Log the request before returning 404
+			if err := h.db.LogRequest(getIPAddress(r), r.URL.Path); err != nil {
+				slog.Error("Failed to log request", "error", err)
+			}
+			w.Header().Set("Content-Type", "text/plain")
+			w.WriteHeader(http.StatusNotFound)
+			w.Write([]byte("404 page not found\n"))
 			return
 		}
 
