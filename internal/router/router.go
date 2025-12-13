@@ -5,24 +5,26 @@ import (
 
 	"github.com/dangogh/silver-eureka/internal/database"
 	"github.com/dangogh/silver-eureka/internal/handler"
+	"github.com/dangogh/silver-eureka/internal/middleware"
 	"github.com/dangogh/silver-eureka/internal/stats"
 )
 
 // New creates a new HTTP router with all application routes
-func New(db *database.DB) http.Handler {
+func New(db *database.DB, authUsername, authPassword string) http.Handler {
 	mux := http.NewServeMux()
 
-	// Health check endpoint
+	// Health check endpoint (public, no auth)
 	mux.HandleFunc("/health", handleHealth(db))
 
-	// Stats endpoints
+	// Stats endpoints (protected with basic auth if configured)
+	authMiddleware := middleware.BasicAuth(authUsername, authPassword)
 	statsHandler := stats.New(db)
-	mux.HandleFunc("/stats/endpoints", statsHandler.HandleEndpointStats)
-	mux.HandleFunc("/stats/sources", statsHandler.HandleSourceStats)
-	mux.HandleFunc("/stats/summary", statsHandler.HandleSummary)
-	mux.HandleFunc("/stats/download", statsHandler.HandleDownload)
+	mux.Handle("/stats/endpoints", authMiddleware(http.HandlerFunc(statsHandler.HandleEndpointStats)))
+	mux.Handle("/stats/sources", authMiddleware(http.HandlerFunc(statsHandler.HandleSourceStats)))
+	mux.Handle("/stats/summary", authMiddleware(http.HandlerFunc(statsHandler.HandleSummary)))
+	mux.Handle("/stats/download", authMiddleware(http.HandlerFunc(statsHandler.HandleDownload)))
 
-	// Default handler for all other requests (logs them)
+	// Default handler for all other requests (logs them, public)
 	logHandler := handler.New(db)
 	mux.Handle("/", logHandler)
 

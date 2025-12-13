@@ -51,8 +51,15 @@ func run() error {
 
 	slog.Info("Database initialized successfully", "database", cfg.DBPath)
 
+	// Log auth status
+	if cfg.AuthUsername != "" && cfg.AuthPassword != "" {
+		slog.Info("HTTP Basic Auth enabled for /stats/* endpoints")
+	} else {
+		slog.Warn("HTTP Basic Auth not configured - stats endpoints are public")
+	}
+
 	// Create HTTP router with all endpoints
-	h := router.New(db)
+	h := router.New(db, cfg.AuthUsername, cfg.AuthPassword)
 
 	// Create HTTP server with concurrency-friendly settings
 	server := &http.Server{

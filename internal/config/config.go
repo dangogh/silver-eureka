@@ -7,8 +7,10 @@ import (
 
 // Config holds the application configuration
 type Config struct {
-	Port   int
-	DBPath string
+	Port         int
+	DBPath       string
+	AuthUsername string
+	AuthPassword string
 }
 
 // Load loads configuration from flags

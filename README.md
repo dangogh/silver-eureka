@@ -1,19 +1,21 @@
 # silver-eureka
 
-A secure HTTPS-only Go web application that logs requests to an SQLite database.
+A Go web application that logs HTTP requests to an SQLite database with optional HTTP Basic Authentication.
 
 ## Features
 
-- **HTTPS-only server** using Go's standard library
-- TLS with configurable certificates (required)
-- Default HTTPS port 443 with override via `--port` flag
+- **HTTP server** on port 8080 (configurable)
+- **Optional HTTP Basic Authentication** to protect statistics endpoints
 - Structured JSON logging with debug level for request details
-- Logs all HTTPS requests with IP address and URL to SQLite database
+- Logs all HTTP requests with IP address and URL to SQLite database
 - **Statistics endpoints** for analyzing logged requests:
   - Overall summary statistics
   - Statistics grouped by endpoint/URL
   - Statistics grouped by source IP address
+  - Downloadable CSV export
+- **Health check endpoint** for monitoring
 - Graceful shutdown handling
+- Docker support with health checks
 - Comprehensive test coverage
 
 ## Requirements
@@ -30,32 +32,40 @@ go build -o app .
 
 ### Running the Server
 
-#### Default HTTPS (port 443)
+#### Default HTTP (port 8080)
 ```bash
-# Generate self-signed certificate for testing
-./generate-cert.sh localhost
+# Without authentication (stats endpoints are public)
+./app
 
-# Run with default HTTPS port 443
-sudo ./app
+# With authentication (protects /stats/* endpoints)
+AUTH_USERNAME=admin AUTH_PASSWORD=secret123 ./app
 
-# Or run on a custom port (no sudo required for ports > 1024)
-./app -port=8443
+# Custom port
+./app -port=9000
+
+# Custom database path
+./app -db=/path/to/requests.db
 ```
 
-#### Custom Port
+#### Using Docker
 ```bash
-./app -port=8443
+# Build and run with Docker Compose
+docker-compose up -d
+
+# Enable authentication by editing docker-compose.yml
+# Uncomment and set AUTH_USERNAME and AUTH_PASSWORD
 ```
 
 ### Configuration
 
-The server is HTTPS-only and requires TLS certificates. The default certificate paths are `server.crt` and `server.key` in the current directory.
+| Environment Variable | Flag | Default | Description |
+|---------------------|------|---------|-------------|
+| `PORT` | `-port` | `8080` | HTTP server port |
+| `DB_PATH` | `-db` | `data/requests.db` | SQLite database file path |
+| `AUTH_USERNAME` | `-auth-user` | `""` | Username for HTTP Basic Auth (optional) |
+| `AUTH_PASSWORD` | `-auth-pass` | `""` | Password for HTTP Basic Auth (optional) |
 
-| Flag | Default | Description |
-|------|---------|-------------|
-| `-port` | `443` | HTTPS server port |
-
-**Note**: Port 443 requires sudo/root privileges. For development, use a port above 1024 (e.g., 8443).
+**Authentication**: When `AUTH_USERNAME` and `AUTH_PASSWORD` are set, all `/stats/*` endpoints require HTTP Basic Authentication. The `/health` and logging endpoints remain public.
 
 ### Testing
 
@@ -94,9 +104,9 @@ Any request to paths other than `/stats/*` will be logged to the database with:
 
 All requests are logged in JSON format with debug-level details including headers, user agent, and more.
 
-Example request (use -k for self-signed cert):
+Example request:
 ```bash
-curl -k https://localhost/any/path
+curl http://localhost:8080/any/path
 ```
 
 Response:
@@ -104,13 +114,30 @@ Response:
 Request logged: /any/path from 127.0.0.1
 ```
 
+#### Health Check
+
+The `/health` endpoint provides service health status (always public, no auth required):
+
+```bash
+curl http://localhost:8080/health
+```
+
+Response:
+```json
+{"status":"healthy","database":"up"}
+```
+
 #### Statistics Endpoints
 
-The application provides three statistics endpoints that return JSON data:
+**Note**: When authentication is enabled via `AUTH_USERNAME` and `AUTH_PASSWORD`, these endpoints require HTTP Basic Auth credentials.
 
 **GET /stats/summary** - Overall statistics
 ```bash
-curl -k https://localhost/stats/summary
+# Without auth
+curl http://localhost:8080/stats/summary
+
+# With auth
+curl -u admin:secret123 http://localhost:8080/stats/summary
 ```
 Response:
 ```json
@@ -125,7 +152,7 @@ Response:
 
 **GET /stats/endpoints** - Statistics grouped by endpoint/URL
 ```bash
-curl -k https://localhost/stats/endpoints
+curl -u admin:secret123 http://localhost:8080/stats/endpoints
 ```
 Response:
 ```json
@@ -149,7 +176,7 @@ Response:
 
 **GET /stats/sources** - Statistics grouped by IP address/source
 ```bash
-curl -k https://localhost/stats/sources
+curl -u admin:secret123 http://localhost:8080/stats/sources
 ```
 Response:
 ```json

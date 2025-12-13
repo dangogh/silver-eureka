@@ -1,6 +1,7 @@
 package router
 
 import (
+	"encoding/base64"
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
@@ -26,7 +27,7 @@ func TestHealthEndpoint_Healthy(t *testing.T) {
 	db := setupTestDB(t)
 	defer db.Close()
 
-	router := New(db)
+	router := New(db, "", "")
 
 	req := httptest.NewRequest(http.MethodGet, "/health", nil)
 	rec := httptest.NewRecorder()
@@ -60,7 +61,7 @@ func TestHealthEndpoint_Unhealthy(t *testing.T) {
 	db := setupTestDB(t)
 	db.Close()
 
-	router := New(db)
+	router := New(db, "", "")
 
 	req := httptest.NewRequest(http.MethodGet, "/health", nil)
 	rec := httptest.NewRecorder()
@@ -92,7 +93,7 @@ func TestStatsEndpointsRegistered(t *testing.T) {
 	// Add some test data to avoid NULL timestamp errors
 	db.LogRequest("192.168.1.1", "/test/path")
 
-	router := New(db)
+	router := New(db, "", "")
 
 	tests := []struct {
 		name     string
@@ -128,7 +129,7 @@ func TestDefaultHandlerLogsRequests(t *testing.T) {
 	db := setupTestDB(t)
 	defer db.Close()
 
-	router := New(db)
+	router := New(db, "", "")
 
 	devNull, _ := os.Open(os.DevNull)
 	defer devNull.Close()
@@ -163,7 +164,7 @@ func TestRouterHandlesMultipleRequests(t *testing.T) {
 	db := setupTestDB(t)
 	defer db.Close()
 
-	router := New(db)
+	router := New(db, "", "")
 
 	devNull, _ := os.Open(os.DevNull)
 	defer devNull.Close()
@@ -191,4 +192,75 @@ func TestRouterHandlesMultipleRequests(t *testing.T) {
 	if len(logs) != len(paths) {
 		t.Errorf("Expected %d logged requests, got %d", len(paths), len(logs))
 	}
+}
+
+func TestBasicAuthProtectsStatsEndpoints(t *testing.T) {
+	db := setupTestDB(t)
+	defer db.Close()
+
+	// Add test data
+	db.LogRequest("192.168.1.1", "/test/path")
+
+	// Create router with auth enabled
+	router := New(db, "admin", "secret123")
+
+	t.Run("stats endpoints require auth", func(t *testing.T) {
+		endpoints := []string{"/stats/summary", "/stats/endpoints", "/stats/sources", "/stats/download"}
+
+		for _, endpoint := range endpoints {
+			req := httptest.NewRequest(http.MethodGet, endpoint, nil)
+			rec := httptest.NewRecorder()
+
+			router.ServeHTTP(rec, req)
+
+			if rec.Code != http.StatusUnauthorized {
+				t.Errorf("Expected 401 for %s without auth, got %d", endpoint, rec.Code)
+			}
+		}
+	})
+
+	t.Run("stats endpoints accessible with valid credentials", func(t *testing.T) {
+		endpoints := []string{"/stats/summary", "/stats/endpoints", "/stats/sources", "/stats/download"}
+		auth := base64.StdEncoding.EncodeToString([]byte("admin:secret123"))
+
+		for _, endpoint := range endpoints {
+			req := httptest.NewRequest(http.MethodGet, endpoint, nil)
+			req.Header.Set("Authorization", "Basic "+auth)
+			rec := httptest.NewRecorder()
+
+			router.ServeHTTP(rec, req)
+
+			if rec.Code != http.StatusOK {
+				t.Errorf("Expected 200 for %s with valid auth, got %d", endpoint, rec.Code)
+			}
+		}
+	})
+
+	t.Run("health endpoint remains public", func(t *testing.T) {
+		req := httptest.NewRequest(http.MethodGet, "/health", nil)
+		rec := httptest.NewRecorder()
+
+		router.ServeHTTP(rec, req)
+
+		if rec.Code != http.StatusOK {
+			t.Errorf("Expected 200 for /health without auth, got %d", rec.Code)
+		}
+	})
+
+	t.Run("logging endpoint remains public", func(t *testing.T) {
+		devNull, _ := os.Open(os.DevNull)
+		defer devNull.Close()
+		oldStdout := os.Stdout
+		os.Stdout = devNull
+		defer func() { os.Stdout = oldStdout }()
+
+		req := httptest.NewRequest(http.MethodGet, "/api/test", nil)
+		rec := httptest.NewRecorder()
+
+		router.ServeHTTP(rec, req)
+
+		if rec.Code != http.StatusOK {
+			t.Errorf("Expected 200 for /api/test without auth, got %d", rec.Code)
+		}
+	})
 }
