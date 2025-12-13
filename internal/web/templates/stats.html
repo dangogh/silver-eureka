@@ -86,6 +86,80 @@
             font-size: 1.5rem;
             font-weight: 600;
         }
+        .chart-container {
+            margin-bottom: 1.5rem;
+        }
+        .chart-item {
+            margin-bottom: 1.5rem;
+        }
+        .chart-label {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 0.25rem;
+            font-size: 0.9rem;
+        }
+        .chart-url {
+            color: #333;
+            font-weight: 500;
+            font-family: 'Courier New', monospace;
+        }
+        .chart-metrics {
+            display: flex;
+            gap: 1rem;
+            color: #666;
+        }
+        .chart-bars {
+            display: flex;
+            flex-direction: column;
+            gap: 0.25rem;
+        }
+        .chart-bar-row {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+        .chart-bar-label {
+            width: 80px;
+            font-size: 0.75rem;
+            color: #666;
+            text-align: right;
+        }
+        .chart-bar-track {
+            flex: 1;
+            height: 20px;
+            background: #f0f0f0;
+            border-radius: 4px;
+            overflow: hidden;
+        }
+        .chart-bar-fill {
+            height: 100%;
+            transition: width 0.3s ease;
+        }
+        .chart-bar-total {
+            background: linear-gradient(90deg, #667eea 0%, #764ba2 100%);
+        }
+        .chart-bar-unique {
+            background: linear-gradient(90deg, #f093fb 0%, #f5576c 100%);
+        }
+        .details-toggle {
+            margin-top: 2rem;
+            text-align: center;
+        }
+        .details-toggle button {
+            padding: 0.5rem 1rem;
+            background: #667eea;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 0.9rem;
+        }
+        .details-toggle button:hover {
+            background: #5568d3;
+        }
+        .details-table {
+            margin-top: 2rem;
+        }
     </style>
 </head>
 <body>
@@ -123,28 +197,62 @@
                 </div>
             {{else if eq .Type "endpoints"}}
                 <h2>Endpoint Statistics</h2>
-                <table>
-                    <thead>
-                        <tr>
-                            <th>URL</th>
-                            <th>Request Count</th>
-                            <th>Unique IPs</th>
-                            <th>First Seen</th>
-                            <th>Last Seen</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        {{range .Data}}
-                        <tr>
-                            <td><code>{{.URL}}</code></td>
-                            <td>{{.Count}}</td>
-                            <td>{{.UniqueIPs}}</td>
-                            <td>{{.FirstSeen}}</td>
-                            <td>{{.LastSeen}}</td>
-                        </tr>
-                        {{end}}
-                    </tbody>
-                </table>
+                <div class="chart-container">
+                    {{range .Data}}
+                    <div class="chart-item">
+                        <div class="chart-label">
+                            <span class="chart-url">{{.URL}}</span>
+                            <span class="chart-metrics">
+                                <span>Total: {{.Count}}</span>
+                                <span>Unique: {{.UniqueIPs}}</span>
+                            </span>
+                        </div>
+                        <div class="chart-bars">
+                            <div class="chart-bar-row">
+                                <div class="chart-bar-label">Total Requests</div>
+                                <div class="chart-bar-track">
+                                    <div class="chart-bar-fill chart-bar-total" style="width: {{if $.MaxCount}}{{div (mul .Count 100) $.MaxCount}}{{else}}0{{end}}%"></div>
+                                </div>
+                            </div>
+                            <div class="chart-bar-row">
+                                <div class="chart-bar-label">Unique IPs</div>
+                                <div class="chart-bar-track">
+                                    <div class="chart-bar-fill chart-bar-unique" style="width: {{if $.MaxUniqueIPs}}{{div (mul .UniqueIPs 100) $.MaxUniqueIPs}}{{else}}0{{end}}%"></div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    {{end}}
+                </div>
+                <div class="details-toggle">
+                    <button onclick="document.querySelector('.details-table').style.display = document.querySelector('.details-table').style.display === 'none' ? 'block' : 'none'">
+                        Toggle Detailed Table
+                    </button>
+                </div>
+                <div class="details-table" style="display: none;">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>URL</th>
+                                <th>Request Count</th>
+                                <th>Unique IPs</th>
+                                <th>First Seen</th>
+                                <th>Last Seen</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {{range .Data}}
+                            <tr>
+                                <td><code>{{.URL}}</code></td>
+                                <td>{{.Count}}</td>
+                                <td>{{.UniqueIPs}}</td>
+                                <td>{{.FirstSeen}}</td>
+                                <td>{{.LastSeen}}</td>
+                            </tr>
+                            {{end}}
+                        </tbody>
+                    </table>
+                </div>
             {{else if eq .Type "sources"}}
                 <h2>Source IP Statistics</h2>
                 <table>

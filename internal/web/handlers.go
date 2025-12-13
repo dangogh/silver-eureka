@@ -165,12 +165,29 @@ func (h *Handler) HandleStatsView(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Calculate max values for bar chart scaling (endpoints only)
+	var maxCount, maxUniqueIPs int
+	if statsType == "endpoints" {
+		if endpoints, ok := data.([]stats.EndpointStat); ok {
+			for _, ep := range endpoints {
+				if ep.Count > maxCount {
+					maxCount = ep.Count
+				}
+				if ep.UniqueIPs > maxUniqueIPs {
+					maxUniqueIPs = ep.UniqueIPs
+				}
+			}
+		}
+	}
+
 	// Render HTML
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
 	templateData := map[string]interface{}{
-		"Title": title,
-		"Type":  statsType,
-		"Data":  data,
+		"Title":        title,
+		"Type":         statsType,
+		"Data":         data,
+		"MaxCount":     maxCount,
+		"MaxUniqueIPs": maxUniqueIPs,
 	}
 
 	if err := h.templates.ExecuteTemplate(w, "stats.html", templateData); err != nil {
