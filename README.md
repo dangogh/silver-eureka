@@ -50,11 +50,12 @@ AUTH_USERNAME=admin AUTH_PASSWORD=secret123 ./app
 
 #### Using Docker
 ```bash
+# Create .env file with your credentials
+cp .env.example .env
+# Edit .env and set AUTH_USERNAME and AUTH_PASSWORD
+
 # Build and run with Docker Compose
 docker-compose up -d
-
-# Enable authentication by editing docker-compose.yml
-# Uncomment and set AUTH_USERNAME and AUTH_PASSWORD
 ```
 
 ### Configuration

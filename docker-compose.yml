@@ -7,9 +7,10 @@ services:
       - ./data:/home/appuser/data
     environment:
       - DB_PATH=/home/appuser/data/requests.db
-      # Uncomment and set these to enable HTTP Basic Auth for /stats/* endpoints
-      # - AUTH_USERNAME=admin
-      # - AUTH_PASSWORD=changeme
+      - AUTH_USERNAME=${AUTH_USERNAME}
+      - AUTH_PASSWORD=${AUTH_PASSWORD}
+    env_file:
+      - .env
     restart: unless-stopped
     healthcheck:
       test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:8080/health"]

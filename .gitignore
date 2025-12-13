@@ -50,3 +50,6 @@ app
 
 # Test coverage
 coverage.out
+
+# Environment variables
+.env
