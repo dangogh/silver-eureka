@@ -21,4 +21,5 @@ COPY --from=builder /app/gather-requests /home/appuser/bin/gather-requests
 RUN chown -R appuser:appuser /home/appuser
 
 USER appuser
-CMD ["bin/gather-requests"]
+ENV PATH="/home/appuser/bin:${PATH}"
+CMD ["gather-requests"]
