@@ -1,0 +1,176 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{.Title}} - Silver Eureka</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+            background: #f5f7fa;
+            min-height: 100vh;
+        }
+        .header {
+            background: white;
+            padding: 1rem 2rem;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .header h1 {
+            color: #667eea;
+            font-size: 1.5rem;
+        }
+        .back-link {
+            color: #667eea;
+            text-decoration: none;
+            font-weight: 500;
+        }
+        .back-link:hover {
+            text-decoration: underline;
+        }
+        .container {
+            max-width: 1200px;
+            margin: 2rem auto;
+            padding: 0 2rem;
+        }
+        .stats-card {
+            background: white;
+            padding: 2rem;
+            border-radius: 8px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+        }
+        h2 {
+            color: #333;
+            margin-bottom: 1.5rem;
+            font-size: 1.5rem;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+        th, td {
+            padding: 0.75rem;
+            text-align: left;
+            border-bottom: 1px solid #e0e0e0;
+        }
+        th {
+            background: #f8f9fa;
+            color: #333;
+            font-weight: 600;
+        }
+        tr:hover {
+            background: #f8f9fa;
+        }
+        .summary-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 1rem;
+            margin-bottom: 2rem;
+        }
+        .summary-item {
+            padding: 1rem;
+            background: #f8f9fa;
+            border-radius: 4px;
+            border-left: 4px solid #667eea;
+        }
+        .summary-label {
+            color: #666;
+            font-size: 0.9rem;
+            margin-bottom: 0.25rem;
+        }
+        .summary-value {
+            color: #333;
+            font-size: 1.5rem;
+            font-weight: 600;
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>{{.Title}}</h1>
+        <a href="/dashboard" class="back-link">← Back to Dashboard</a>
+    </div>
+    
+    <div class="container">
+        <div class="stats-card">
+            {{if eq .Type "summary"}}
+                <div class="summary-grid">
+                    <div class="summary-item">
+                        <div class="summary-label">Total Requests</div>
+                        <div class="summary-value">{{.Data.TotalRequests}}</div>
+                    </div>
+                    <div class="summary-item">
+                        <div class="summary-label">Unique IPs</div>
+                        <div class="summary-value">{{.Data.UniqueIPs}}</div>
+                    </div>
+                    <div class="summary-item">
+                        <div class="summary-label">Unique URLs</div>
+                        <div class="summary-value">{{.Data.UniqueURLs}}</div>
+                    </div>
+                </div>
+                <div class="summary-grid">
+                    <div class="summary-item">
+                        <div class="summary-label">First Request</div>
+                        <div class="summary-value" style="font-size: 1rem;">{{.Data.FirstRequest}}</div>
+                    </div>
+                    <div class="summary-item">
+                        <div class="summary-label">Last Request</div>
+                        <div class="summary-value" style="font-size: 1rem;">{{.Data.LastRequest}}</div>
+                    </div>
+                </div>
+            {{else if eq .Type "endpoints"}}
+                <h2>Endpoint Statistics</h2>
+                <table>
+                    <thead>
+                        <tr>
+                            <th>URL</th>
+                            <th>Request Count</th>
+                            <th>Unique IPs</th>
+                            <th>First Seen</th>
+                            <th>Last Seen</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {{range .Data}}
+                        <tr>
+                            <td><code>{{.URL}}</code></td>
+                            <td>{{.Count}}</td>
+                            <td>{{.UniqueIPs}}</td>
+                            <td>{{.FirstSeen}}</td>
+                            <td>{{.LastSeen}}</td>
+                        </tr>
+                        {{end}}
+                    </tbody>
+                </table>
+            {{else if eq .Type "sources"}}
+                <h2>Source IP Statistics</h2>
+                <table>
+                    <thead>
+                        <tr>
+                            <th>IP Address</th>
+                            <th>Request Count</th>
+                            <th>Unique URLs</th>
+                            <th>First Seen</th>
+                            <th>Last Seen</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {{range .Data}}
+                        <tr>
+                            <td><code>{{.IPAddress}}</code></td>
+                            <td>{{.Count}}</td>
+                            <td>{{.UniqueURLs}}</td>
+                            <td>{{.FirstSeen}}</td>
+                            <td>{{.LastSeen}}</td>
+                        </tr>
+                        {{end}}
+                    </tbody>
+                </table>
+            {{end}}
+        </div>
+    </div>
+</body>
+</html>

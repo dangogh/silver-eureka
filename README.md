@@ -6,6 +6,7 @@ A Go web application that logs HTTP requests to an SQLite database with optional
 
 - **HTTP server** on port 8080 (configurable)
 - **Optional HTTP Basic Authentication** to protect statistics endpoints
+- **Web interface** with session-based authentication for easy stats viewing
 - Structured JSON logging with debug level for request details
 - Logs all HTTP requests with IP address and URL to SQLite database
 - **Statistics endpoints** for analyzing logged requests:
@@ -93,7 +94,23 @@ make clean
 
 ### API
 
-The application provides both request logging and statistics endpoints.
+The application provides both a web interface and API endpoints.
+
+#### Web Interface
+
+When authentication is configured, access the web interface at:
+
+```
+http://localhost:8080/login
+```
+
+After logging in, you'll see a dashboard with links to view all statistics in formatted HTML tables.
+
+**Features:**
+- Session-based authentication (24-hour timeout)
+- Dashboard with stat cards
+- Formatted HTML views for all statistics
+- Logout functionality
 
 #### Request Logging
 

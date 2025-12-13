@@ -7,6 +7,7 @@ import (
 	"github.com/dangogh/silver-eureka/internal/handler"
 	"github.com/dangogh/silver-eureka/internal/middleware"
 	"github.com/dangogh/silver-eureka/internal/stats"
+	"github.com/dangogh/silver-eureka/internal/web"
 )
 
 // New creates a new HTTP router with all application routes
@@ -16,7 +17,17 @@ func New(db *database.DB, authUsername, authPassword string) http.Handler {
 	// Health check endpoint (public, no auth)
 	mux.HandleFunc("/health", handleHealth(db))
 
-	// Stats endpoints (protected with basic auth if configured)
+	// Web interface routes (session-based auth)
+	if authUsername != "" && authPassword != "" {
+		webHandler := web.NewHandler(db, authUsername, authPassword)
+		mux.HandleFunc("GET /login", webHandler.HandleLoginPage)
+		mux.HandleFunc("POST /login", webHandler.HandleLoginSubmit)
+		mux.HandleFunc("POST /logout", webHandler.RequireAuth(webHandler.HandleLogout))
+		mux.HandleFunc("GET /dashboard", webHandler.RequireAuth(webHandler.HandleDashboard))
+		mux.HandleFunc("GET /stats-view/{type}", webHandler.RequireAuth(webHandler.HandleStatsView))
+	}
+
+	// API stats endpoints (protected with basic auth if configured)
 	authMiddleware := middleware.BasicAuth(authUsername, authPassword)
 	statsHandler := stats.New(db)
 	mux.Handle("/stats/endpoints", authMiddleware(http.HandlerFunc(statsHandler.HandleEndpointStats)))
