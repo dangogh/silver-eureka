@@ -59,16 +59,12 @@ func TestBasicAuth(t *testing.T) {
 
 		handler.ServeHTTP(rec, req)
 
-		if rec.Code != http.StatusUnauthorized {
-			t.Errorf("Expected status 401, got %d", rec.Code)
+		if rec.Code != http.StatusNotFound {
+			t.Errorf("Expected status 404, got %d", rec.Code)
 		}
 
-		if rec.Header().Get("WWW-Authenticate") != `Basic realm="Restricted"` {
-			t.Errorf("Expected WWW-Authenticate header, got %s", rec.Header().Get("WWW-Authenticate"))
-		}
-
-		if rec.Header().Get("Content-Type") != "application/json" {
-			t.Errorf("Expected Content-Type application/json, got %s", rec.Header().Get("Content-Type"))
+		if rec.Body.String() != "404 page not found\n" {
+			t.Errorf("Expected '404 page not found', got %s", rec.Body.String())
 		}
 	})
 
@@ -83,8 +79,8 @@ func TestBasicAuth(t *testing.T) {
 
 		handler.ServeHTTP(rec, req)
 
-		if rec.Code != http.StatusUnauthorized {
-			t.Errorf("Expected status 401, got %d", rec.Code)
+		if rec.Code != http.StatusNotFound {
+			t.Errorf("Expected status 404, got %d", rec.Code)
 		}
 	})
 
@@ -99,8 +95,8 @@ func TestBasicAuth(t *testing.T) {
 
 		handler.ServeHTTP(rec, req)
 
-		if rec.Code != http.StatusUnauthorized {
-			t.Errorf("Expected status 401, got %d", rec.Code)
+		if rec.Code != http.StatusNotFound {
+			t.Errorf("Expected status 404, got %d", rec.Code)
 		}
 	})
 
@@ -114,8 +110,8 @@ func TestBasicAuth(t *testing.T) {
 
 		handler.ServeHTTP(rec, req)
 
-		if rec.Code != http.StatusUnauthorized {
-			t.Errorf("Expected status 401, got %d", rec.Code)
+		if rec.Code != http.StatusNotFound {
+			t.Errorf("Expected status 404, got %d", rec.Code)
 		}
 	})
 }

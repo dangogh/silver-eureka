@@ -17,7 +17,7 @@ func BasicAuth(username, password string) func(http.Handler) http.Handler {
 
 			user, pass, ok := r.BasicAuth()
 			if !ok {
-				unauthorized(w)
+				notFound(w)
 				return
 			}
 
@@ -26,7 +26,7 @@ func BasicAuth(username, password string) func(http.Handler) http.Handler {
 			passMatch := subtle.ConstantTimeCompare([]byte(pass), []byte(password)) == 1
 
 			if !userMatch || !passMatch {
-				unauthorized(w)
+				notFound(w)
 				return
 			}
 
@@ -35,9 +35,8 @@ func BasicAuth(username, password string) func(http.Handler) http.Handler {
 	}
 }
 
-func unauthorized(w http.ResponseWriter) {
-	w.Header().Set("WWW-Authenticate", `Basic realm="Restricted"`)
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(http.StatusUnauthorized)
-	w.Write([]byte(`{"error":"unauthorized","message":"valid credentials required"}`))
+func notFound(w http.ResponseWriter) {
+	w.Header().Set("Content-Type", "text/plain")
+	w.WriteHeader(http.StatusNotFound)
+	w.Write([]byte("404 page not found\n"))
 }

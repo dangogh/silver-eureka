@@ -213,8 +213,8 @@ func TestBasicAuthProtectsStatsEndpoints(t *testing.T) {
 
 			router.ServeHTTP(rec, req)
 
-			if rec.Code != http.StatusUnauthorized {
-				t.Errorf("Expected 401 for %s without auth, got %d", endpoint, rec.Code)
+			if rec.Code != http.StatusNotFound {
+				t.Errorf("Expected 404 for %s without auth, got %d", endpoint, rec.Code)
 			}
 		}
 	})
