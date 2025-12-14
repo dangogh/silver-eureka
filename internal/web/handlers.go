@@ -29,8 +29,8 @@ type Handler struct {
 // NewHandler creates a new web interface handler
 func NewHandler(db *database.DB, authUsername, authPassword string) *Handler {
 	funcMap := template.FuncMap{
-		"mul": func(a, b int) int { return a * b },
-		"div": func(a, b int) int {
+		"mul": func(a, b int64) int64 { return a * b },
+		"div": func(a, b int64) int64 {
 			if b == 0 {
 				return 0
 			}
