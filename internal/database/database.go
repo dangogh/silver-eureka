@@ -332,7 +332,7 @@ func (db *DB) GetSummary() (*Summary, error) {
 	`
 
 	var summary Summary
-	var firstRequest, lastRequest string
+	var firstRequest, lastRequest sql.NullString
 	err := db.conn.QueryRow(query).Scan(
 		&summary.TotalRequests,
 		&summary.UniqueIPs,
@@ -344,15 +344,19 @@ func (db *DB) GetSummary() (*Summary, error) {
 		return nil, fmt.Errorf("failed to query summary stats: %w", err)
 	}
 
-	// Parse timestamps
-	if summary.FirstRequest, err = time.Parse("2006-01-02 15:04:05.999999999-07:00", firstRequest); err != nil {
-		if summary.FirstRequest, err = time.Parse("2006-01-02 15:04:05", firstRequest); err != nil {
-			return nil, fmt.Errorf("failed to parse first_request: %w", err)
+	// Parse timestamps if they exist (not NULL)
+	if firstRequest.Valid {
+		if summary.FirstRequest, err = time.Parse("2006-01-02 15:04:05.999999999-07:00", firstRequest.String); err != nil {
+			if summary.FirstRequest, err = time.Parse("2006-01-02 15:04:05", firstRequest.String); err != nil {
+				return nil, fmt.Errorf("failed to parse first_request: %w", err)
+			}
 		}
 	}
-	if summary.LastRequest, err = time.Parse("2006-01-02 15:04:05.999999999-07:00", lastRequest); err != nil {
-		if summary.LastRequest, err = time.Parse("2006-01-02 15:04:05", lastRequest); err != nil {
-			return nil, fmt.Errorf("failed to parse last_request: %w", err)
+	if lastRequest.Valid {
+		if summary.LastRequest, err = time.Parse("2006-01-02 15:04:05.999999999-07:00", lastRequest.String); err != nil {
+			if summary.LastRequest, err = time.Parse("2006-01-02 15:04:05", lastRequest.String); err != nil {
+				return nil, fmt.Errorf("failed to parse last_request: %w", err)
+			}
 		}
 	}
 
