@@ -21,6 +21,7 @@ func New(db *database.DB) *Handler {
 
 // ServeHTTP implements the http.Handler interface
 func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	slog.Debug("Handler invoked: ServeHTTP (catch-all)", "method", r.Method, "path", r.URL.Path)
 	// Limit request body size to 1MB to prevent memory exhaustion
 	r.Body = http.MaxBytesReader(w, r.Body, 1<<20)
 
@@ -59,10 +60,10 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		"url", url,
 	)
 
-	// Respond with a simple message
+	// Return 404 for all unmatched routes
 	w.Header().Set("Content-Type", "text/plain")
-	w.WriteHeader(http.StatusOK)
-	fmt.Fprintf(w, "Request logged: %s from %s\n", url, ipAddress)
+	w.WriteHeader(http.StatusNotFound)
+	fmt.Fprintf(w, "404 page not found\n")
 }
 
 // getIPAddress extracts the client IP address from the request

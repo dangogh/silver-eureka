@@ -30,13 +30,19 @@ func TestServeHTTP(t *testing.T) {
 	// Serve the request
 	h.ServeHTTP(w, req)
 
-	// Check response
-	if w.Code != http.StatusOK {
-		t.Errorf("Expected status 200, got %d", w.Code)
+	// Check response - should return 404 for unmatched routes
+	if w.Code != http.StatusNotFound {
+		t.Errorf("Expected status 404, got %d", w.Code)
 	}
 
 	if w.Header().Get("Content-Type") != "text/plain" {
 		t.Errorf("Expected Content-Type text/plain, got %s", w.Header().Get("Content-Type"))
+	}
+
+	// Check response body
+	expectedBody := "404 page not found\n"
+	if w.Body.String() != expectedBody {
+		t.Errorf("Expected body %q, got %q", expectedBody, w.Body.String())
 	}
 
 	// Verify log was created
@@ -60,11 +66,11 @@ func TestServeHTTP(t *testing.T) {
 
 func TestGetIPAddress(t *testing.T) {
 	tests := []struct {
-		name           string
-		remoteAddr     string
-		xff            string
-		xri            string
-		expectedIP     string
+		name       string
+		remoteAddr string
+		xff        string
+		xri        string
+		expectedIP string
 	}{
 		{
 			name:       "RemoteAddr only",
