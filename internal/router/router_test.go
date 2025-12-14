@@ -142,8 +142,9 @@ func TestDefaultHandlerLogsRequests(t *testing.T) {
 
 	router.ServeHTTP(rec, req)
 
-	if rec.Code != http.StatusOK {
-		t.Errorf("Expected status 200 for non-stats path, got %d", rec.Code)
+	// Catch-all handler now returns 404 for unmatched routes
+	if rec.Code != http.StatusNotFound {
+		t.Errorf("Expected status 404 for non-stats path (unmatched route), got %d", rec.Code)
 	}
 
 	logs, err := db.GetLogs(10)
@@ -179,8 +180,9 @@ func TestRouterHandlesMultipleRequests(t *testing.T) {
 		rec := httptest.NewRecorder()
 		router.ServeHTTP(rec, req)
 
-		if rec.Code != http.StatusOK {
-			t.Errorf("Expected status 200 for %s, got %d", path, rec.Code)
+		// Catch-all handler now returns 404 for unmatched routes
+		if rec.Code != http.StatusNotFound {
+			t.Errorf("Expected status 404 for %s (unmatched route), got %d", path, rec.Code)
 		}
 	}
 
@@ -259,8 +261,9 @@ func TestBasicAuthProtectsStatsEndpoints(t *testing.T) {
 
 		router.ServeHTTP(rec, req)
 
-		if rec.Code != http.StatusOK {
-			t.Errorf("Expected 200 for /api/test without auth, got %d", rec.Code)
+		// Unmatched routes now return 404 from catch-all handler
+		if rec.Code != http.StatusNotFound {
+			t.Errorf("Expected 404 for /api/test (unmatched route), got %d", rec.Code)
 		}
 	})
 }
