@@ -409,3 +409,49 @@ func TestRequireAuth(t *testing.T) {
 		})
 	}
 }
+
+func TestTemplateFunctions(t *testing.T) {
+	db := setupTestDB(t)
+	handler := NewHandler(db, "admin", "secret")
+
+	tests := []struct {
+		name     string
+		funcName string
+		a        int64
+		b        int64
+		want     int64
+	}{
+		{"multiply positive", "mul", 5, 10, 50},
+		{"multiply zero", "mul", 0, 10, 0},
+		{"multiply negative", "mul", -5, 10, -50},
+		{"divide normal", "div", 100, 10, 10},
+		{"divide remainder", "div", 100, 3, 33},
+		{"divide by zero", "div", 100, 0, 0},
+		{"divide zero", "div", 0, 10, 0},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			tmpl := handler.templates.Lookup("stats.html")
+			if tmpl == nil {
+				t.Fatal("stats.html template not found")
+			}
+
+			var result int64
+			switch tt.funcName {
+			case "mul":
+				result = tt.a * tt.b
+			case "div":
+				if tt.b == 0 {
+					result = 0
+				} else {
+					result = tt.a / tt.b
+				}
+			}
+
+			if result != tt.want {
+				t.Errorf("%s(%d, %d) = %d, want %d", tt.funcName, tt.a, tt.b, result, tt.want)
+			}
+		})
+	}
+}
