@@ -166,9 +166,9 @@ func (h *Handler) HandleStatsView(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Calculate max values for bar chart scaling (endpoints only)
-	var maxCount, maxUniqueIPs int
+	var maxCount, maxUniqueIPs int64
 	if statsType == "endpoints" {
-		if endpoints, ok := data.([]stats.EndpointStat); ok {
+		if endpoints, ok := data.([]database.EndpointStats); ok {
 			for _, ep := range endpoints {
 				if ep.Count > maxCount {
 					maxCount = ep.Count
