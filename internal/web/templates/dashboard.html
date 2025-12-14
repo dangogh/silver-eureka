@@ -92,6 +92,7 @@
     <div class="header">
         <h1>Silver Eureka Dashboard</h1>
         <form class="logout-form" method="POST" action="/logout">
+            <input type="hidden" name="csrf_token" value="{{.CSRFToken}}">
             <button type="submit" class="logout-btn">Logout</button>
         </form>
     </div>

@@ -50,6 +50,7 @@ func NewHandler(db *database.DB, authUsername, authPassword string) *Handler {
 
 // HandleLoginPage displays the login form
 func (h *Handler) HandleLoginPage(w http.ResponseWriter, r *http.Request) {
+	slog.Debug("Handler invoked: HandleLoginPage", "method", r.Method, "path", r.URL.Path)
 	// Check if already logged in
 	if cookie, err := r.Cookie(sessionCookieName); err == nil {
 		if _, ok := h.sessions.Get(cookie.Value); ok {
@@ -58,8 +59,27 @@ func (h *Handler) HandleLoginPage(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
+	// Generate temporary CSRF token for login form
+	csrfToken, err := generateToken()
+	if err != nil {
+		slog.Error("Failed to generate CSRF token", "error", err)
+		http.Error(w, "Internal server error", http.StatusInternalServerError)
+		return
+	}
+
+	// Store CSRF token in cookie temporarily (for login validation)
+	http.SetCookie(w, &http.Cookie{
+		Name:     "csrf_token",
+		Value:    csrfToken,
+		Path:     "/",
+		MaxAge:   600, // 10 minutes
+		HttpOnly: true,
+		Secure:   false,
+		SameSite: http.SameSiteStrictMode,
+	})
+
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
-	if err := h.templates.ExecuteTemplate(w, "login.html", nil); err != nil {
+	if err := h.templates.ExecuteTemplate(w, "login.html", map[string]interface{}{"CSRFToken": csrfToken}); err != nil {
 		slog.Error("Failed to render login template", "error", err)
 		http.Error(w, "Internal server error", http.StatusInternalServerError)
 	}
@@ -67,10 +87,31 @@ func (h *Handler) HandleLoginPage(w http.ResponseWriter, r *http.Request) {
 
 // HandleLoginSubmit processes login form submission
 func (h *Handler) HandleLoginSubmit(w http.ResponseWriter, r *http.Request) {
+	slog.Debug("Handler invoked: HandleLoginSubmit", "method", r.Method, "path", r.URL.Path)
 	if err := r.ParseForm(); err != nil {
 		http.Error(w, "Invalid form data", http.StatusBadRequest)
 		return
 	}
+
+	// Validate CSRF token
+	submittedToken := r.FormValue("csrf_token")
+	csrfCookie, err := r.Cookie("csrf_token")
+	if err != nil || subtle.ConstantTimeCompare([]byte(submittedToken), []byte(csrfCookie.Value)) != 1 {
+		slog.Warn("CSRF token validation failed", "remote_addr", r.RemoteAddr)
+		w.Header().Set("Content-Type", "text/plain")
+		w.WriteHeader(http.StatusForbidden)
+		w.Write([]byte("403 forbidden\n"))
+		return
+	}
+
+	// Clear CSRF cookie after use
+	http.SetCookie(w, &http.Cookie{
+		Name:     "csrf_token",
+		Value:    "",
+		Path:     "/",
+		MaxAge:   -1,
+		HttpOnly: true,
+	})
 
 	username := r.FormValue("username")
 	password := r.FormValue("password")
@@ -112,8 +153,19 @@ func (h *Handler) HandleLoginSubmit(w http.ResponseWriter, r *http.Request) {
 
 // HandleLogout logs out the user
 func (h *Handler) HandleLogout(w http.ResponseWriter, r *http.Request) {
+	slog.Debug("Handler invoked: HandleLogout", "method", r.Method, "path", r.URL.Path)
+	// Validate CSRF token from session
 	cookie, err := r.Cookie(sessionCookieName)
 	if err == nil {
+		if session, ok := h.sessions.Get(cookie.Value); ok {
+			submittedToken := r.FormValue("csrf_token")
+			if subtle.ConstantTimeCompare([]byte(submittedToken), []byte(session.CSRFToken)) != 1 {
+				slog.Warn("CSRF token validation failed on logout", "remote_addr", r.RemoteAddr)
+				w.WriteHeader(http.StatusForbidden)
+				w.Write([]byte("403 forbidden\n"))
+				return
+			}
+		}
 		h.sessions.Delete(cookie.Value)
 	}
 
@@ -131,8 +183,17 @@ func (h *Handler) HandleLogout(w http.ResponseWriter, r *http.Request) {
 
 // HandleDashboard displays the main dashboard
 func (h *Handler) HandleDashboard(w http.ResponseWriter, r *http.Request) {
+	slog.Debug("Handler invoked: HandleDashboard", "method", r.Method, "path", r.URL.Path)
+	// Get session for CSRF token
+	var csrfToken string
+	if cookie, err := r.Cookie(sessionCookieName); err == nil {
+		if session, ok := h.sessions.Get(cookie.Value); ok {
+			csrfToken = session.CSRFToken
+		}
+	}
+
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
-	if err := h.templates.ExecuteTemplate(w, "dashboard.html", nil); err != nil {
+	if err := h.templates.ExecuteTemplate(w, "dashboard.html", map[string]interface{}{"CSRFToken": csrfToken}); err != nil {
 		slog.Error("Failed to render dashboard template", "error", err)
 		http.Error(w, "Internal server error", http.StatusInternalServerError)
 	}
@@ -140,6 +201,7 @@ func (h *Handler) HandleDashboard(w http.ResponseWriter, r *http.Request) {
 
 // HandleStatsView displays stats in HTML format
 func (h *Handler) HandleStatsView(w http.ResponseWriter, r *http.Request) {
+	slog.Debug("Handler invoked: HandleStatsView", "method", r.Method, "path", r.URL.Path)
 	statsType := r.PathValue("type")
 
 	var data interface{}
@@ -234,6 +296,7 @@ func getIPAddress(r *http.Request) string {
 // RequireAuth is middleware that ensures user is authenticated
 func (h *Handler) RequireAuth(next http.HandlerFunc) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
+		slog.Debug("Middleware invoked: RequireAuth", "method", r.Method, "path", r.URL.Path)
 		cookie, err := r.Cookie(sessionCookieName)
 		if err != nil {
 			// Log the request before returning 404

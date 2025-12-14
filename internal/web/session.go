@@ -1,8 +1,6 @@
 package web
 
 import (
-	"crypto/rand"
-	"encoding/hex"
 	"sync"
 	"time"
 )
@@ -10,6 +8,7 @@ import (
 // Session represents an authenticated user session
 type Session struct {
 	Username  string
+	CSRFToken string
 	ExpiresAt time.Time
 }
 
@@ -33,13 +32,19 @@ func NewSessionStore(timeout time.Duration) *SessionStore {
 
 // Create creates a new session for the given username
 func (s *SessionStore) Create(username string) (string, error) {
-	sessionID, err := generateSessionID()
+	sessionID, err := generateToken()
+	if err != nil {
+		return "", err
+	}
+
+	csrfToken, err := generateToken()
 	if err != nil {
 		return "", err
 	}
 
 	session := Session{
 		Username:  username,
+		CSRFToken: csrfToken,
 		ExpiresAt: time.Now().Add(s.timeout),
 	}
 
@@ -85,13 +90,4 @@ func (s *SessionStore) cleanupExpired() {
 			return true
 		})
 	}
-}
-
-// generateSessionID generates a cryptographically secure random session ID
-func generateSessionID() (string, error) {
-	b := make([]byte, 32)
-	if _, err := rand.Read(b); err != nil {
-		return "", err
-	}
-	return hex.EncodeToString(b), nil
 }
