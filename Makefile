@@ -1,4 +1,4 @@
-.PHONY: test cover clean
+.PHONY: test cover clean lint
 
 # Run all tests with race detection and generate coverage report
 test:
@@ -7,6 +7,10 @@ test:
 # Open coverage report in browser
 cover: test
 	go tool cover -html=coverage.out
+
+# Run linters
+lint:
+	golangci-lint run
 
 # Clean up generated files
 clean:
