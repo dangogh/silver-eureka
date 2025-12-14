@@ -28,7 +28,16 @@ type Handler struct {
 
 // NewHandler creates a new web interface handler
 func NewHandler(db *database.DB, authUsername, authPassword string) *Handler {
-	tmpl := template.Must(template.ParseFS(templatesFS, "templates/*.html"))
+	funcMap := template.FuncMap{
+		"mul": func(a, b int) int { return a * b },
+		"div": func(a, b int) int {
+			if b == 0 {
+				return 0
+			}
+			return a / b
+		},
+	}
+	tmpl := template.Must(template.New("").Funcs(funcMap).ParseFS(templatesFS, "templates/*.html"))
 
 	return &Handler{
 		db:           db,
