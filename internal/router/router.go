@@ -1,7 +1,9 @@
 package router
 
 import (
+	"log/slog"
 	"net/http"
+	"strings"
 
 	"github.com/dangogh/silver-eureka/internal/database"
 	"github.com/dangogh/silver-eureka/internal/handler"
@@ -35,7 +37,7 @@ func New(db *database.DB, authUsername, authPassword string) http.Handler {
 	mux.Handle("/stats/summary", authMiddleware(http.HandlerFunc(statsHandler.HandleSummary)))
 	mux.Handle("/stats/download", authMiddleware(http.HandlerFunc(statsHandler.HandleDownload)))
 
-	// Default handler for all other requests (logs them, public)
+	// Default handler for all other requests (logs them, returns 404)
 	logHandler := handler.New(db)
 	mux.Handle("/", logHandler)
 
@@ -45,6 +47,7 @@ func New(db *database.DB, authUsername, authPassword string) http.Handler {
 // handleHealth returns a health check handler
 func handleHealth(db *database.DB) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
+		slog.Debug("Handler invoked: handleHealth", "method", r.Method, "path", r.URL.Path)
 		// Check database connectivity
 		if err := db.Ping(); err != nil {
 			w.Header().Set("Content-Type", "application/json")
@@ -57,4 +60,27 @@ func handleHealth(db *database.DB) http.HandlerFunc {
 		w.WriteHeader(http.StatusOK)
 		w.Write([]byte(`{"status":"healthy","database":"up"}`))
 	}
+}
+
+// getIPAddress extracts the client IP address from the request
+func getIPAddress(r *http.Request) string {
+	// Check X-Forwarded-For header
+	if xff := r.Header.Get("X-Forwarded-For"); xff != "" {
+		ips := strings.Split(xff, ",")
+		if len(ips) > 0 {
+			return strings.TrimSpace(ips[0])
+		}
+	}
+
+	// Check X-Real-IP header
+	if xri := r.Header.Get("X-Real-IP"); xri != "" {
+		return xri
+	}
+
+	// Fall back to RemoteAddr
+	addr := r.RemoteAddr
+	if idx := strings.LastIndex(addr, ":"); idx != -1 {
+		return addr[:idx]
+	}
+	return addr
 }
