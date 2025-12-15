@@ -110,6 +110,17 @@ func TestGetIPAddress(t *testing.T) {
 			xri:        "203.0.113.2",
 			expectedIP: "203.0.113.1",
 		},
+		{
+			name:       "RemoteAddr without port",
+			remoteAddr: "192.168.1.1",
+			expectedIP: "192.168.1.1",
+		},
+		{
+			name:       "X-Forwarded-For with whitespace",
+			remoteAddr: "192.168.1.1:12345",
+			xff:        " 203.0.113.1 , 198.51.100.1",
+			expectedIP: "203.0.113.1",
+		},
 	}
 
 	for _, tt := range tests {
@@ -128,5 +139,105 @@ func TestGetIPAddress(t *testing.T) {
 				t.Errorf("Expected IP %s, got %s", tt.expectedIP, ip)
 			}
 		})
+	}
+}
+
+func TestServeHTTP_DatabaseError(t *testing.T) {
+	// Create temporary database
+	dbPath := "/tmp/test_handler_error.db"
+	defer func() {
+		if err := os.Remove(dbPath); err != nil {
+			// Ignore remove errors in test cleanup
+		}
+	}()
+
+	db, err := database.New(dbPath)
+	if err != nil {
+		t.Fatalf("Failed to create database: %v", err)
+	}
+
+	// Close the database to force an error
+	if err := db.Close(); err != nil {
+		t.Fatalf("Failed to close database: %v", err)
+	}
+
+	h := New(db)
+
+	// Create test request
+	req := httptest.NewRequest(http.MethodGet, "/test/path", nil)
+	req.RemoteAddr = "192.168.1.1:12345"
+	w := httptest.NewRecorder()
+
+	// Serve the request - should return 503 due to database error
+	h.ServeHTTP(w, req)
+
+	// Check response
+	if w.Code != http.StatusServiceUnavailable {
+		t.Errorf("Expected status 503, got %d", w.Code)
+	}
+
+	if w.Header().Get("Content-Type") != "application/json" {
+		t.Errorf("Expected Content-Type application/json, got %s", w.Header().Get("Content-Type"))
+	}
+
+	// Check response body contains error message
+	body := w.Body.String()
+	if body != `{"error":"logging temporarily unavailable","status":"degraded"}` {
+		t.Errorf("Expected degraded error message, got %q", body)
+	}
+}
+
+func TestServeHTTP_WithHeaders(t *testing.T) {
+	// Create temporary database
+	dbPath := "/tmp/test_handler_headers.db"
+	defer func() {
+		if err := os.Remove(dbPath); err != nil {
+			// Ignore remove errors in test cleanup
+		}
+	}()
+
+	db, err := database.New(dbPath)
+	if err != nil {
+		t.Fatalf("Failed to create database: %v", err)
+	}
+	defer func() {
+		if err := db.Close(); err != nil {
+			// Ignore close errors in test cleanup
+		}
+	}()
+
+	h := New(db)
+
+	// Create test request with X-Forwarded-For header
+	req := httptest.NewRequest(http.MethodPost, "/api/endpoint?param=value", nil)
+	req.RemoteAddr = "192.168.1.1:12345"
+	req.Header.Set("X-Forwarded-For", "203.0.113.1, 198.51.100.1")
+	req.Header.Set("User-Agent", "TestAgent/1.0")
+	w := httptest.NewRecorder()
+
+	// Serve the request
+	h.ServeHTTP(w, req)
+
+	// Check response
+	if w.Code != http.StatusNotFound {
+		t.Errorf("Expected status 404, got %d", w.Code)
+	}
+
+	// Verify log was created with correct IP from X-Forwarded-For
+	logs, err := db.GetLogs(1)
+	if err != nil {
+		t.Fatalf("Failed to get logs: %v", err)
+	}
+
+	if len(logs) != 1 {
+		t.Fatalf("Expected 1 log entry, got %d", len(logs))
+	}
+
+	if logs[0].IPAddress != "203.0.113.1" {
+		t.Errorf("Expected IP 203.0.113.1 (from X-Forwarded-For), got %s", logs[0].IPAddress)
+	}
+
+	if logs[0].URL != "/api/endpoint?param=value" {
+		t.Errorf("Expected URL /api/endpoint?param=value, got %s", logs[0].URL)
 	}
 }
