@@ -35,6 +35,7 @@ jobs:
         with:
           file: ./coverage.out
           fail_ci_if_error: false
+          token: ${{ secrets.CODECOV_TOKEN }}
 
   lint:
     name: Lint
