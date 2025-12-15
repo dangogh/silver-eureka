@@ -455,3 +455,137 @@ func TestTemplateFunctions(t *testing.T) {
 		})
 	}
 }
+
+func TestGetIPAddress(t *testing.T) {
+	tests := []struct {
+		name       string
+		xff        string
+		xri        string
+		remoteAddr string
+		want       string
+	}{
+		{
+			name:       "X-Forwarded-For single IP",
+			xff:        "203.0.113.195",
+			remoteAddr: "192.168.1.1:1234",
+			want:       "203.0.113.195",
+		},
+		{
+			name:       "X-Forwarded-For multiple IPs",
+			xff:        "203.0.113.195, 70.41.3.18, 150.172.238.178",
+			remoteAddr: "192.168.1.1:1234",
+			want:       "203.0.113.195",
+		},
+		{
+			name:       "X-Real-IP",
+			xri:        "203.0.113.195",
+			remoteAddr: "192.168.1.1:1234",
+			want:       "203.0.113.195",
+		},
+		{
+			name:       "X-Forwarded-For takes precedence over X-Real-IP",
+			xff:        "203.0.113.1",
+			xri:        "203.0.113.2",
+			remoteAddr: "192.168.1.1:1234",
+			want:       "203.0.113.1",
+		},
+		{
+			name:       "RemoteAddr fallback",
+			remoteAddr: "192.168.1.1:1234",
+			want:       "192.168.1.1:1234",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			req := httptest.NewRequest(http.MethodGet, "/test", nil)
+			if tt.xff != "" {
+				req.Header.Set("X-Forwarded-For", tt.xff)
+			}
+			if tt.xri != "" {
+				req.Header.Set("X-Real-IP", tt.xri)
+			}
+			req.RemoteAddr = tt.remoteAddr
+
+			got := getIPAddress(req)
+			if got != tt.want {
+				t.Errorf("getIPAddress() = %q, want %q", got, tt.want)
+			}
+		})
+	}
+}
+
+func TestHandleLoginPage_Redirect(t *testing.T) {
+	db := setupTestDB(t)
+	handler := NewHandler(db, "admin", "secret")
+
+	// Create a valid session
+	sessionID, err := handler.sessions.Create("admin")
+	if err != nil {
+		t.Fatalf("Failed to create session: %v", err)
+	}
+
+	req := httptest.NewRequest(http.MethodGet, "/login", nil)
+	req.AddCookie(&http.Cookie{
+		Name:  "session_id",
+		Value: sessionID,
+	})
+	rec := httptest.NewRecorder()
+
+	handler.HandleLoginPage(rec, req)
+
+	if rec.Code != http.StatusSeeOther {
+		t.Errorf("Status = %d, want %d", rec.Code, http.StatusSeeOther)
+	}
+
+	location := rec.Header().Get("Location")
+	if location != "/dashboard" {
+		t.Errorf("Location = %q, want %q", location, "/dashboard")
+	}
+}
+
+func TestHandleLoginSubmit_ParseFormError(t *testing.T) {
+	db := setupTestDB(t)
+	handler := NewHandler(db, "admin", "secret")
+
+	// Send invalid form data (malformed content-type)
+	req := httptest.NewRequest(http.MethodPost, "/login", strings.NewReader("%ZZ"))
+	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	req.AddCookie(&http.Cookie{
+		Name:  "csrf_token",
+		Value: "token",
+	})
+	rec := httptest.NewRecorder()
+
+	handler.HandleLoginSubmit(rec, req)
+
+	if rec.Code != http.StatusBadRequest {
+		t.Errorf("Status = %d, want %d", rec.Code, http.StatusBadRequest)
+	}
+}
+
+func TestHandleStatsView_JSON(t *testing.T) {
+	db := setupTestDB(t)
+	handler := NewHandler(db, "admin", "secret")
+
+	// Add test data
+	if err := db.LogRequest("192.168.1.1", "/test"); err != nil {
+		t.Fatalf("Failed to log request: %v", err)
+	}
+
+	req := httptest.NewRequest(http.MethodGet, "/stats-view/summary", nil)
+	req.Header.Set("Accept", "application/json")
+	req.SetPathValue("type", "summary")
+	rec := httptest.NewRecorder()
+
+	handler.HandleStatsView(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Errorf("Status = %d, want %d", rec.Code, http.StatusOK)
+	}
+
+	ct := rec.Header().Get("Content-Type")
+	if ct != "application/json" {
+		t.Errorf("Content-Type = %q, want %q", ct, "application/json")
+	}
+}
