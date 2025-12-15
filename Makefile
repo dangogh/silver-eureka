@@ -3,6 +3,7 @@
 # Run all tests with race detection and generate coverage report
 test:
 	go test -race -coverprofile=coverage.out -covermode=atomic ./...
+	@go tool cover -func=coverage.out | grep total:
 
 # Open coverage report in browser
 cover: test
