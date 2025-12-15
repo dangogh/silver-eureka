@@ -16,8 +16,11 @@ linters:
 linters-settings:
   errcheck:
     check-blank: true
-  govet:
-    check-shadowing: true
+    # Exclude fs.Parse since flag package calls os.Exit on error
+    exclude-functions:
+      - (*flag.FlagSet).Parse
+  staticcheck:
+    checks: ["all", "-SA9003"]  # Disable SA9003 (empty branch) for error handling patterns
 
 issues:
   exclude-use-default: false

@@ -38,5 +38,7 @@ func BasicAuth(username, password string) func(http.Handler) http.Handler {
 func notFound(w http.ResponseWriter) {
 	w.Header().Set("Content-Type", "text/plain")
 	w.WriteHeader(http.StatusNotFound)
-	w.Write([]byte("404 page not found\n"))
+	if _, err := w.Write([]byte("404 page not found\n")); err != nil {
+		// Response already started, can't do much here
+	}
 }

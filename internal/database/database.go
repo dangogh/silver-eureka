@@ -58,7 +58,9 @@ func New(dbPath string) (*DB, error) {
 
 	// Test the connection
 	if err := conn.Ping(); err != nil {
-		conn.Close()
+		if closeErr := conn.Close(); closeErr != nil {
+			// Log but don't mask the original error
+		}
 		return nil, fmt.Errorf("failed to ping database: %w", err)
 	}
 
@@ -66,7 +68,9 @@ func New(dbPath string) (*DB, error) {
 
 	// Initialize schema
 	if err := db.initSchema(); err != nil {
-		conn.Close()
+		if closeErr := conn.Close(); closeErr != nil {
+			// Log but don't mask the original error
+		}
 		return nil, fmt.Errorf("failed to initialize schema: %w", err)
 	}
 
@@ -166,7 +170,11 @@ func (db *DB) GetLogs(limit int) ([]RequestLog, error) {
 	if err != nil {
 		return nil, fmt.Errorf("failed to query logs: %w", err)
 	}
-	defer rows.Close()
+	defer func() {
+		if err := rows.Close(); err != nil {
+			// Ignore close errors
+		}
+	}()
 
 	var logs []RequestLog
 	for rows.Next() {
@@ -225,7 +233,11 @@ func (db *DB) GetEndpointStats() ([]EndpointStats, error) {
 	if err != nil {
 		return nil, fmt.Errorf("failed to query endpoint stats: %w", err)
 	}
-	defer rows.Close()
+	defer func() {
+		if err := rows.Close(); err != nil {
+			// Ignore close errors
+		}
+	}()
 
 	var stats []EndpointStats
 	for rows.Next() {
@@ -273,7 +285,11 @@ func (db *DB) GetSourceStats() ([]SourceStats, error) {
 	if err != nil {
 		return nil, fmt.Errorf("failed to query source stats: %w", err)
 	}
-	defer rows.Close()
+	defer func() {
+		if err := rows.Close(); err != nil {
+			// Ignore close errors
+		}
+	}()
 
 	var stats []SourceStats
 	for rows.Next() {

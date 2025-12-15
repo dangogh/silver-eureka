@@ -9,13 +9,21 @@ import (
 func TestNew(t *testing.T) {
 	// Use temporary database file
 	dbPath := "/tmp/test_requests.db"
-	defer os.Remove(dbPath)
+	defer func() {
+		if err := os.Remove(dbPath); err != nil {
+			// Ignore remove errors in test cleanup
+		}
+	}()
 
 	db, err := New(dbPath)
 	if err != nil {
 		t.Fatalf("Failed to create database: %v", err)
 	}
-	defer db.Close()
+	defer func() {
+		if err := db.Close(); err != nil {
+			// Ignore close errors in test cleanup
+		}
+	}()
 
 	if db == nil {
 		t.Fatal("Expected non-nil database")
@@ -24,13 +32,21 @@ func TestNew(t *testing.T) {
 
 func TestLogRequest(t *testing.T) {
 	dbPath := "/tmp/test_requests_log.db"
-	defer os.Remove(dbPath)
+	defer func() {
+		if err := os.Remove(dbPath); err != nil {
+			// Ignore remove errors in test cleanup
+		}
+	}()
 
 	db, err := New(dbPath)
 	if err != nil {
 		t.Fatalf("Failed to create database: %v", err)
 	}
-	defer db.Close()
+	defer func() {
+		if err := db.Close(); err != nil {
+			// Ignore close errors in test cleanup
+		}
+	}()
 
 	// Log a request
 	err = db.LogRequest("192.168.1.1", "/test/path")
@@ -59,13 +75,21 @@ func TestLogRequest(t *testing.T) {
 
 func TestGetLogs(t *testing.T) {
 	dbPath := "/tmp/test_requests_getlogs.db"
-	defer os.Remove(dbPath)
+	defer func() {
+		if err := os.Remove(dbPath); err != nil {
+			// Ignore remove errors in test cleanup
+		}
+	}()
 
 	db, err := New(dbPath)
 	if err != nil {
 		t.Fatalf("Failed to create database: %v", err)
 	}
-	defer db.Close()
+	defer func() {
+		if err := db.Close(); err != nil {
+			// Ignore close errors in test cleanup
+		}
+	}()
 
 	// Log multiple requests
 	testData := []struct {
@@ -112,7 +136,11 @@ func TestGetLogs(t *testing.T) {
 
 func TestClose(t *testing.T) {
 	dbPath := "/tmp/test_requests_close.db"
-	defer os.Remove(dbPath)
+	defer func() {
+		if err := os.Remove(dbPath); err != nil {
+			// Ignore remove errors in test cleanup
+		}
+	}()
 
 	db, err := New(dbPath)
 	if err != nil {

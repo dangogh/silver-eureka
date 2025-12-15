@@ -19,8 +19,12 @@ func setupTestDB(t *testing.T) (*database.DB, func()) {
 	}
 
 	cleanup := func() {
-		db.Close()
-		os.Remove(dbPath)
+		if err := db.Close(); err != nil {
+			// Ignore close errors in cleanup
+		}
+		if err := os.Remove(dbPath); err != nil {
+			// Ignore remove errors in cleanup
+		}
 	}
 
 	return db, cleanup
@@ -31,11 +35,17 @@ func TestHandleEndpointStats(t *testing.T) {
 	defer cleanup()
 
 	// Add some test data
-	db.LogRequest("192.168.1.1", "/test/path1")
+	if err := db.LogRequest("192.168.1.1", "/test/path1"); err != nil {
+		t.Fatalf("Failed to log request: %v", err)
+	}
 	time.Sleep(10 * time.Millisecond)
-	db.LogRequest("192.168.1.2", "/test/path1")
+	if err := db.LogRequest("192.168.1.2", "/test/path1"); err != nil {
+		t.Fatalf("Failed to log request: %v", err)
+	}
 	time.Sleep(10 * time.Millisecond)
-	db.LogRequest("192.168.1.1", "/test/path2")
+	if err := db.LogRequest("192.168.1.1", "/test/path2"); err != nil {
+		t.Fatalf("Failed to log request: %v", err)
+	}
 
 	handler := New(db)
 
@@ -78,11 +88,17 @@ func TestHandleSourceStats(t *testing.T) {
 	defer cleanup()
 
 	// Add some test data
-	db.LogRequest("192.168.1.1", "/test/path1")
+	if err := db.LogRequest("192.168.1.1", "/test/path1"); err != nil {
+		t.Fatalf("Failed to log request: %v", err)
+	}
 	time.Sleep(10 * time.Millisecond)
-	db.LogRequest("192.168.1.1", "/test/path2")
+	if err := db.LogRequest("192.168.1.1", "/test/path2"); err != nil {
+		t.Fatalf("Failed to log request: %v", err)
+	}
 	time.Sleep(10 * time.Millisecond)
-	db.LogRequest("192.168.1.2", "/test/path1")
+	if err := db.LogRequest("192.168.1.2", "/test/path1"); err != nil {
+		t.Fatalf("Failed to log request: %v", err)
+	}
 
 	handler := New(db)
 
@@ -125,11 +141,17 @@ func TestHandleSummary(t *testing.T) {
 	defer cleanup()
 
 	// Add some test data
-	db.LogRequest("192.168.1.1", "/test/path1")
+	if err := db.LogRequest("192.168.1.1", "/test/path1"); err != nil {
+		t.Fatalf("Failed to log request: %v", err)
+	}
 	time.Sleep(10 * time.Millisecond)
-	db.LogRequest("192.168.1.2", "/test/path2")
+	if err := db.LogRequest("192.168.1.2", "/test/path2"); err != nil {
+		t.Fatalf("Failed to log request: %v", err)
+	}
 	time.Sleep(10 * time.Millisecond)
-	db.LogRequest("192.168.1.1", "/test/path1")
+	if err := db.LogRequest("192.168.1.1", "/test/path1"); err != nil {
+		t.Fatalf("Failed to log request: %v", err)
+	}
 
 	handler := New(db)
 

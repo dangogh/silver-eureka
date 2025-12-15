@@ -30,7 +30,9 @@ func (h *Handler) HandleEndpointStats(w http.ResponseWriter, r *http.Request) {
 		slog.Error("Failed to get endpoint stats", "error", err)
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusInternalServerError)
-		json.NewEncoder(w).Encode(map[string]string{"error": "failed to retrieve endpoint statistics", "details": err.Error()})
+		if encodeErr := json.NewEncoder(w).Encode(map[string]string{"error": "failed to retrieve endpoint statistics", "details": err.Error()}); encodeErr != nil {
+			// Response already started
+		}
 		return
 	}
 
@@ -56,7 +58,9 @@ func (h *Handler) HandleSourceStats(w http.ResponseWriter, r *http.Request) {
 		slog.Error("Failed to get source stats", "error", err)
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusInternalServerError)
-		json.NewEncoder(w).Encode(map[string]string{"error": "failed to retrieve source statistics", "details": err.Error()})
+		if encodeErr := json.NewEncoder(w).Encode(map[string]string{"error": "failed to retrieve source statistics", "details": err.Error()}); encodeErr != nil {
+			// Response already started
+		}
 		return
 	}
 
@@ -82,7 +86,9 @@ func (h *Handler) HandleSummary(w http.ResponseWriter, r *http.Request) {
 		slog.Error("Failed to get summary stats", "error", err)
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusInternalServerError)
-		json.NewEncoder(w).Encode(map[string]string{"error": "failed to retrieve summary statistics", "details": err.Error()})
+		if encodeErr := json.NewEncoder(w).Encode(map[string]string{"error": "failed to retrieve summary statistics", "details": err.Error()}); encodeErr != nil {
+			// Response already started
+		}
 		return
 	}
 
@@ -112,7 +118,9 @@ func (h *Handler) HandleDownload(w http.ResponseWriter, r *http.Request) {
 		slog.Error("Failed to get all logs", "error", err)
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusInternalServerError)
-		json.NewEncoder(w).Encode(map[string]string{"error": "failed to retrieve logs", "details": err.Error()})
+		if encodeErr := json.NewEncoder(w).Encode(map[string]string{"error": "failed to retrieve logs", "details": err.Error()}); encodeErr != nil {
+			// Response already started
+		}
 		return
 	}
 

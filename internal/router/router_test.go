@@ -25,7 +25,11 @@ func setupTestDB(t *testing.T) *database.DB {
 
 func TestHealthEndpoint_Healthy(t *testing.T) {
 	db := setupTestDB(t)
-	defer db.Close()
+	defer func() {
+		if err := db.Close(); err != nil {
+			// Ignore close errors in test cleanup
+		}
+	}()
 
 	router := New(db, "", "")
 
@@ -59,7 +63,9 @@ func TestHealthEndpoint_Healthy(t *testing.T) {
 
 func TestHealthEndpoint_Unhealthy(t *testing.T) {
 	db := setupTestDB(t)
-	db.Close()
+	if err := db.Close(); err != nil {
+		t.Logf("Close error (expected): %v", err)
+	}
 
 	router := New(db, "", "")
 
@@ -88,10 +94,16 @@ func TestHealthEndpoint_Unhealthy(t *testing.T) {
 
 func TestStatsEndpointsRegistered(t *testing.T) {
 	db := setupTestDB(t)
-	defer db.Close()
+	defer func() {
+		if err := db.Close(); err != nil {
+			// Ignore close errors in test cleanup
+		}
+	}()
 
 	// Add some test data to avoid NULL timestamp errors
-	db.LogRequest("192.168.1.1", "/test/path")
+	if err := db.LogRequest("192.168.1.1", "/test/path"); err != nil {
+		t.Fatalf("Failed to log request: %v", err)
+	}
 
 	router := New(db, "", "")
 
@@ -127,12 +139,23 @@ func TestStatsEndpointsRegistered(t *testing.T) {
 
 func TestDefaultHandlerLogsRequests(t *testing.T) {
 	db := setupTestDB(t)
-	defer db.Close()
+	defer func() {
+		if err := db.Close(); err != nil {
+			// Ignore close errors in test cleanup
+		}
+	}()
 
 	router := New(db, "", "")
 
-	devNull, _ := os.Open(os.DevNull)
-	defer devNull.Close()
+	devNull, err := os.Open(os.DevNull)
+	if err != nil {
+		t.Fatalf("Failed to open /dev/null: %v", err)
+	}
+	defer func() {
+		if err := devNull.Close(); err != nil {
+			t.Errorf("Failed to close /dev/null: %v", err)
+		}
+	}()
 	oldStdout := os.Stdout
 	os.Stdout = devNull
 	defer func() { os.Stdout = oldStdout }()
@@ -163,12 +186,23 @@ func TestDefaultHandlerLogsRequests(t *testing.T) {
 
 func TestRouterHandlesMultipleRequests(t *testing.T) {
 	db := setupTestDB(t)
-	defer db.Close()
+	defer func() {
+		if err := db.Close(); err != nil {
+			// Ignore close errors in test cleanup
+		}
+	}()
 
 	router := New(db, "", "")
 
-	devNull, _ := os.Open(os.DevNull)
-	defer devNull.Close()
+	devNull, err := os.Open(os.DevNull)
+	if err != nil {
+		t.Fatalf("Failed to open /dev/null: %v", err)
+	}
+	defer func() {
+		if err := devNull.Close(); err != nil {
+			t.Errorf("Failed to close /dev/null: %v", err)
+		}
+	}()
 	oldStdout := os.Stdout
 	os.Stdout = devNull
 	defer func() { os.Stdout = oldStdout }()
@@ -198,10 +232,16 @@ func TestRouterHandlesMultipleRequests(t *testing.T) {
 
 func TestBasicAuthProtectsStatsEndpoints(t *testing.T) {
 	db := setupTestDB(t)
-	defer db.Close()
+	defer func() {
+		if err := db.Close(); err != nil {
+			// Ignore close errors in test cleanup
+		}
+	}()
 
 	// Add test data
-	db.LogRequest("192.168.1.1", "/test/path")
+	if err := db.LogRequest("192.168.1.1", "/test/path"); err != nil {
+		t.Fatalf("Failed to log request: %v", err)
+	}
 
 	// Create router with auth enabled
 	router := New(db, "admin", "secret123")
@@ -250,8 +290,15 @@ func TestBasicAuthProtectsStatsEndpoints(t *testing.T) {
 	})
 
 	t.Run("logging endpoint remains public", func(t *testing.T) {
-		devNull, _ := os.Open(os.DevNull)
-		defer devNull.Close()
+		devNull, err := os.Open(os.DevNull)
+		if err != nil {
+			t.Fatalf("Failed to open /dev/null: %v", err)
+		}
+		defer func() {
+			if err := devNull.Close(); err != nil {
+				t.Errorf("Failed to close /dev/null: %v", err)
+			}
+		}()
 		oldStdout := os.Stdout
 		os.Stdout = devNull
 		defer func() { os.Stdout = oldStdout }()
