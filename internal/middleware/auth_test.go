@@ -11,7 +11,9 @@ func TestBasicAuth(t *testing.T) {
 	// Create a simple test handler that always succeeds
 	successHandler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
-		w.Write([]byte("success"))
+		if _, err := w.Write([]byte("success")); err != nil {
+			t.Errorf("Failed to write response: %v", err)
+		}
 	})
 
 	t.Run("no auth configured allows all requests", func(t *testing.T) {

@@ -3,7 +3,6 @@ package router
 import (
 	"log/slog"
 	"net/http"
-	"strings"
 
 	"github.com/dangogh/silver-eureka/internal/database"
 	"github.com/dangogh/silver-eureka/internal/handler"
@@ -52,35 +51,16 @@ func handleHealth(db *database.DB) http.HandlerFunc {
 		if err := db.Ping(); err != nil {
 			w.Header().Set("Content-Type", "application/json")
 			w.WriteHeader(http.StatusServiceUnavailable)
-			w.Write([]byte(`{"status":"unhealthy","database":"down"}`))
+			if _, writeErr := w.Write([]byte(`{"status":"unhealthy","database":"down"}`)); writeErr != nil {
+				// Response already started
+			}
 			return
 		}
 
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusOK)
-		w.Write([]byte(`{"status":"healthy","database":"up"}`))
-	}
-}
-
-// getIPAddress extracts the client IP address from the request
-func getIPAddress(r *http.Request) string {
-	// Check X-Forwarded-For header
-	if xff := r.Header.Get("X-Forwarded-For"); xff != "" {
-		ips := strings.Split(xff, ",")
-		if len(ips) > 0 {
-			return strings.TrimSpace(ips[0])
+		if _, err := w.Write([]byte(`{"status":"healthy","database":"up"}`)); err != nil {
+			// Response already started
 		}
 	}
-
-	// Check X-Real-IP header
-	if xri := r.Header.Get("X-Real-IP"); xri != "" {
-		return xri
-	}
-
-	// Fall back to RemoteAddr
-	addr := r.RemoteAddr
-	if idx := strings.LastIndex(addr, ":"); idx != -1 {
-		return addr[:idx]
-	}
-	return addr
 }

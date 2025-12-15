@@ -12,13 +12,21 @@ import (
 func TestServeHTTP(t *testing.T) {
 	// Create temporary database
 	dbPath := "/tmp/test_handler.db"
-	defer os.Remove(dbPath)
+	defer func() {
+		if err := os.Remove(dbPath); err != nil {
+			// Ignore remove errors in test cleanup
+		}
+	}()
 
 	db, err := database.New(dbPath)
 	if err != nil {
 		t.Fatalf("Failed to create database: %v", err)
 	}
-	defer db.Close()
+	defer func() {
+		if err := db.Close(); err != nil {
+			// Ignore close errors in test cleanup
+		}
+	}()
 
 	h := New(db)
 

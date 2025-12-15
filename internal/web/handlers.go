@@ -100,7 +100,9 @@ func (h *Handler) HandleLoginSubmit(w http.ResponseWriter, r *http.Request) {
 		slog.Warn("CSRF token validation failed", "remote_addr", r.RemoteAddr)
 		w.Header().Set("Content-Type", "text/plain")
 		w.WriteHeader(http.StatusForbidden)
-		w.Write([]byte("403 forbidden\n"))
+		if _, err := w.Write([]byte("403 forbidden\n")); err != nil {
+			// Response already started
+		}
 		return
 	}
 
@@ -124,7 +126,9 @@ func (h *Handler) HandleLoginSubmit(w http.ResponseWriter, r *http.Request) {
 		time.Sleep(100 * time.Millisecond) // Prevent timing attacks
 		w.Header().Set("Content-Type", "text/plain")
 		w.WriteHeader(http.StatusUnauthorized)
-		w.Write([]byte("401 unauthorized\n"))
+		if _, err := w.Write([]byte("401 unauthorized\n")); err != nil {
+			// Response already started
+		}
 		return
 	}
 
@@ -162,7 +166,9 @@ func (h *Handler) HandleLogout(w http.ResponseWriter, r *http.Request) {
 			if subtle.ConstantTimeCompare([]byte(submittedToken), []byte(session.CSRFToken)) != 1 {
 				slog.Warn("CSRF token validation failed on logout", "remote_addr", r.RemoteAddr)
 				w.WriteHeader(http.StatusForbidden)
-				w.Write([]byte("403 forbidden\n"))
+				if _, err := w.Write([]byte("403 forbidden\n")); err != nil {
+					// Response already started
+				}
 				return
 			}
 		}
@@ -232,7 +238,9 @@ func (h *Handler) HandleStatsView(w http.ResponseWriter, r *http.Request) {
 	// Check if client wants JSON
 	if r.Header.Get("Accept") == "application/json" {
 		w.Header().Set("Content-Type", "application/json")
-		json.NewEncoder(w).Encode(data)
+		if err := json.NewEncoder(w).Encode(data); err != nil {
+			// Response already started
+		}
 		return
 	}
 
@@ -305,7 +313,9 @@ func (h *Handler) RequireAuth(next http.HandlerFunc) http.HandlerFunc {
 			}
 			w.Header().Set("Content-Type", "text/plain")
 			w.WriteHeader(http.StatusNotFound)
-			w.Write([]byte("404 page not found\n"))
+			if _, writeErr := w.Write([]byte("404 page not found\n")); writeErr != nil {
+				// Response already started
+			}
 			return
 		}
 
@@ -317,7 +327,9 @@ func (h *Handler) RequireAuth(next http.HandlerFunc) http.HandlerFunc {
 			}
 			w.Header().Set("Content-Type", "text/plain")
 			w.WriteHeader(http.StatusNotFound)
-			w.Write([]byte("404 page not found\n"))
+			if _, writeErr := w.Write([]byte("404 page not found\n")); writeErr != nil {
+				// Response already started
+			}
 			return
 		}
 

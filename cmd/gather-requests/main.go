@@ -47,7 +47,11 @@ func run() error {
 	if err != nil {
 		return fmt.Errorf("failed to initialize database: %w", err)
 	}
-	defer db.Close()
+	defer func() {
+		if err := db.Close(); err != nil {
+			slog.Error("Failed to close database", "error", err)
+		}
+	}()
 
 	slog.Info("Database initialized successfully", "database", cfg.DBPath)
 
@@ -100,7 +104,9 @@ func run() error {
 		// Attempt graceful shutdown
 		if err := server.Shutdown(ctx); err != nil {
 			// Force close if graceful shutdown fails
-			server.Close()
+			if closeErr := server.Close(); closeErr != nil {
+				slog.Error("Failed to force close server", "error", closeErr)
+			}
 			return fmt.Errorf("could not gracefully shutdown server: %w", err)
 		}
 

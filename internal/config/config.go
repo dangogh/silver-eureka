@@ -42,7 +42,7 @@ func LoadWithFlagSet(fs *flag.FlagSet, args []string) *Config {
 	dbPathFlag := fs.String("db", cfg.DBPath, "Database file path")
 	authUserFlag := fs.String("auth-user", cfg.AuthUsername, "Username for HTTP Basic Auth (optional)")
 	authPassFlag := fs.String("auth-pass", cfg.AuthPassword, "Password for HTTP Basic Auth (optional)")
-	fs.Parse(args)
+	_ = fs.Parse(args)
 
 	cfg.Port = *port
 	cfg.DBPath = *dbPathFlag

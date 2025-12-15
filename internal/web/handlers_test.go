@@ -13,13 +13,21 @@ import (
 
 func setupTestDB(t *testing.T) *database.DB {
 	dbPath := "/tmp/test_web_" + t.Name() + ".db"
-	t.Cleanup(func() { os.Remove(dbPath) })
+	t.Cleanup(func() {
+		if err := os.Remove(dbPath); err != nil {
+			// Ignore remove errors in cleanup
+		}
+	})
 
 	db, err := database.New(dbPath)
 	if err != nil {
 		t.Fatalf("Failed to create test database: %v", err)
 	}
-	t.Cleanup(func() { db.Close() })
+	t.Cleanup(func() {
+		if err := db.Close(); err != nil {
+			// Ignore close errors in cleanup
+		}
+	})
 
 	return db
 }
@@ -257,7 +265,10 @@ func TestHandleDashboard(t *testing.T) {
 	handler := NewHandler(db, "admin", "secret")
 
 	// Create a session for authenticated access
-	sessionID, _ := handler.sessions.Create("admin")
+	sessionID, err := handler.sessions.Create("admin")
+	if err != nil {
+		t.Fatalf("Failed to create session: %v", err)
+	}
 
 	req := httptest.NewRequest(http.MethodGet, "/dashboard", nil)
 	req.AddCookie(&http.Cookie{
@@ -282,8 +293,12 @@ func TestHandleStatsView(t *testing.T) {
 	handler := NewHandler(db, "admin", "secret")
 
 	// Add some test data
-	db.LogRequest("192.168.1.1", "/test1")
-	db.LogRequest("192.168.1.2", "/test2")
+	if err := db.LogRequest("192.168.1.1", "/test1"); err != nil {
+		t.Fatalf("Failed to log request: %v", err)
+	}
+	if err := db.LogRequest("192.168.1.2", "/test2"); err != nil {
+		t.Fatalf("Failed to log request: %v", err)
+	}
 
 	tests := []struct {
 		name       string
@@ -316,7 +331,10 @@ func TestRequireAuth(t *testing.T) {
 	handler := NewHandler(db, "admin", "secret")
 
 	// Create a valid session
-	sessionID, _ := handler.sessions.Create("admin")
+	sessionID, err := handler.sessions.Create("admin")
+	if err != nil {
+		t.Fatalf("Failed to create session: %v", err)
+	}
 
 	tests := []struct {
 		name       string
@@ -347,12 +365,17 @@ func TestRequireAuth(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			// Count existing logs
-			logsBefore, _ := db.GetLogs(100)
+			logsBefore, err := db.GetLogs(100)
+			if err != nil {
+				t.Fatalf("Failed to get logs before: %v", err)
+			}
 			countBefore := len(logsBefore)
 
 			nextHandler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 				w.WriteHeader(http.StatusOK)
-				w.Write([]byte("success"))
+				if _, err := w.Write([]byte("success")); err != nil {
+					t.Errorf("Failed to write response: %v", err)
+				}
 			})
 
 			req := httptest.NewRequest(http.MethodGet, "/protected", nil)
@@ -371,7 +394,10 @@ func TestRequireAuth(t *testing.T) {
 			}
 
 			// Check if request was logged
-			logsAfter, _ := db.GetLogs(100)
+			logsAfter, err := db.GetLogs(100)
+			if err != nil {
+				t.Fatalf("Failed to get logs after: %v", err)
+			}
 			countAfter := len(logsAfter)
 
 			if tt.wantLogged && countAfter != countBefore+1 {

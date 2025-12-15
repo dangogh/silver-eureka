@@ -51,7 +51,9 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		// Graceful degradation: return error response but don't crash
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusServiceUnavailable)
-		fmt.Fprintf(w, `{"error":"logging temporarily unavailable","status":"degraded"}`)
+		if _, err := fmt.Fprintf(w, `{"error":"logging temporarily unavailable","status":"degraded"}`); err != nil {
+			// Response already started
+		}
 		return
 	}
 
@@ -63,7 +65,9 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	// Return 404 for all unmatched routes
 	w.Header().Set("Content-Type", "text/plain")
 	w.WriteHeader(http.StatusNotFound)
-	fmt.Fprintf(w, "404 page not found\n")
+	if _, err := fmt.Fprintf(w, "404 page not found\n"); err != nil {
+		// Response already started
+	}
 }
 
 // getIPAddress extracts the client IP address from the request
