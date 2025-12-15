@@ -183,3 +183,177 @@ func TestHandleSummary(t *testing.T) {
 		t.Errorf("Expected 2 unique URLs, got %d", summary.UniqueURLs)
 	}
 }
+
+func TestHandleDownload(t *testing.T) {
+	db, cleanup := setupTestDB(t)
+	defer cleanup()
+
+	// Add test data
+	if err := db.LogRequest("192.168.1.1", "/api/users"); err != nil {
+		t.Fatalf("Failed to log request: %v", err)
+	}
+	time.Sleep(10 * time.Millisecond)
+	if err := db.LogRequest("192.168.1.2", "/api/posts"); err != nil {
+		t.Fatalf("Failed to log request: %v", err)
+	}
+	time.Sleep(10 * time.Millisecond)
+	if err := db.LogRequest("192.168.1.1", "/health"); err != nil {
+		t.Fatalf("Failed to log request: %v", err)
+	}
+
+	handler := New(db)
+	req := httptest.NewRequest(http.MethodGet, "/stats/download", nil)
+	w := httptest.NewRecorder()
+
+	handler.HandleDownload(w, req)
+
+	if w.Code != http.StatusOK {
+		t.Errorf("Expected status 200, got %d", w.Code)
+	}
+
+	if ct := w.Header().Get("Content-Type"); ct != "application/json" {
+		t.Errorf("Expected Content-Type application/json, got %s", ct)
+	}
+
+	if cd := w.Header().Get("Content-Disposition"); cd != "attachment; filename=\"request_logs.json\"" {
+		t.Errorf("Expected Content-Disposition with filename, got %s", cd)
+	}
+
+	var logs []database.RequestLog
+	if err := json.NewDecoder(w.Body).Decode(&logs); err != nil {
+		t.Fatalf("Failed to decode response: %v", err)
+	}
+
+	if len(logs) != 3 {
+		t.Errorf("Expected 3 logs, got %d", len(logs))
+	}
+
+	// Verify logs are in reverse chronological order (newest first)
+	if logs[0].URL != "/health" {
+		t.Errorf("Expected first log to be /health, got %s", logs[0].URL)
+	}
+}
+
+func TestHandleDownload_EmptyDatabase(t *testing.T) {
+	db, cleanup := setupTestDB(t)
+	defer cleanup()
+
+	handler := New(db)
+	req := httptest.NewRequest(http.MethodGet, "/stats/download", nil)
+	w := httptest.NewRecorder()
+
+	handler.HandleDownload(w, req)
+
+	if w.Code != http.StatusOK {
+		t.Errorf("Expected status 200, got %d", w.Code)
+	}
+
+	var logs []database.RequestLog
+	if err := json.NewDecoder(w.Body).Decode(&logs); err != nil {
+		t.Fatalf("Failed to decode response: %v", err)
+	}
+
+	if len(logs) != 0 {
+		t.Errorf("Expected 0 logs from empty database, got %d", len(logs))
+	}
+}
+
+func TestHandleEndpointStats_DatabaseError(t *testing.T) {
+	db, cleanup := setupTestDB(t)
+	cleanup() // Close database to trigger error
+
+	handler := New(db)
+	req := httptest.NewRequest(http.MethodGet, "/stats/endpoints", nil)
+	w := httptest.NewRecorder()
+
+	handler.HandleEndpointStats(w, req)
+
+	if w.Code != http.StatusInternalServerError {
+		t.Errorf("Expected status 500, got %d", w.Code)
+	}
+
+	if ct := w.Header().Get("Content-Type"); ct != "application/json" {
+		t.Errorf("Expected Content-Type application/json, got %s", ct)
+	}
+
+	var errResp map[string]string
+	if err := json.NewDecoder(w.Body).Decode(&errResp); err != nil {
+		t.Fatalf("Failed to decode error response: %v", err)
+	}
+
+	if _, ok := errResp["error"]; !ok {
+		t.Error("Expected error field in response")
+	}
+}
+
+func TestHandleSourceStats_DatabaseError(t *testing.T) {
+	db, cleanup := setupTestDB(t)
+	cleanup() // Close database to trigger error
+
+	handler := New(db)
+	req := httptest.NewRequest(http.MethodGet, "/stats/sources", nil)
+	w := httptest.NewRecorder()
+
+	handler.HandleSourceStats(w, req)
+
+	if w.Code != http.StatusInternalServerError {
+		t.Errorf("Expected status 500, got %d", w.Code)
+	}
+
+	var errResp map[string]string
+	if err := json.NewDecoder(w.Body).Decode(&errResp); err != nil {
+		t.Fatalf("Failed to decode error response: %v", err)
+	}
+
+	if _, ok := errResp["error"]; !ok {
+		t.Error("Expected error field in response")
+	}
+}
+
+func TestHandleSummary_DatabaseError(t *testing.T) {
+	db, cleanup := setupTestDB(t)
+	cleanup() // Close database to trigger error
+
+	handler := New(db)
+	req := httptest.NewRequest(http.MethodGet, "/stats/summary", nil)
+	w := httptest.NewRecorder()
+
+	handler.HandleSummary(w, req)
+
+	if w.Code != http.StatusInternalServerError {
+		t.Errorf("Expected status 500, got %d", w.Code)
+	}
+
+	var errResp map[string]string
+	if err := json.NewDecoder(w.Body).Decode(&errResp); err != nil {
+		t.Fatalf("Failed to decode error response: %v", err)
+	}
+
+	if _, ok := errResp["error"]; !ok {
+		t.Error("Expected error field in response")
+	}
+}
+
+func TestHandleDownload_DatabaseError(t *testing.T) {
+	db, cleanup := setupTestDB(t)
+	cleanup() // Close database to trigger error
+
+	handler := New(db)
+	req := httptest.NewRequest(http.MethodGet, "/stats/download", nil)
+	w := httptest.NewRecorder()
+
+	handler.HandleDownload(w, req)
+
+	if w.Code != http.StatusInternalServerError {
+		t.Errorf("Expected status 500, got %d", w.Code)
+	}
+
+	var errResp map[string]string
+	if err := json.NewDecoder(w.Body).Decode(&errResp); err != nil {
+		t.Fatalf("Failed to decode error response: %v", err)
+	}
+
+	if _, ok := errResp["error"]; !ok {
+		t.Error("Expected error field in response")
+	}
+}
