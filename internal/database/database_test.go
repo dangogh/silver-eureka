@@ -162,13 +162,21 @@ func TestClose(t *testing.T) {
 
 func TestPing(t *testing.T) {
 	dbPath := "/tmp/test_requests_ping.db"
-	defer os.Remove(dbPath)
+	defer func() {
+		if err := os.Remove(dbPath); err != nil {
+			// Ignore remove errors in test cleanup
+		}
+	}()
 
 	db, err := New(dbPath)
 	if err != nil {
 		t.Fatalf("Failed to create database: %v", err)
 	}
-	defer db.Close()
+	defer func() {
+		if err := db.Close(); err != nil {
+			// Ignore close errors in test cleanup
+		}
+	}()
 
 	// Test ping on open connection
 	if err := db.Ping(); err != nil {
@@ -176,7 +184,9 @@ func TestPing(t *testing.T) {
 	}
 
 	// Test ping after close
-	db.Close()
+	if err := db.Close(); err != nil {
+		t.Logf("Close error (expected): %v", err)
+	}
 	if err := db.Ping(); err == nil {
 		t.Error("Expected error pinging closed database")
 	}
@@ -190,13 +200,21 @@ func TestPing(t *testing.T) {
 
 func TestGetAllLogs(t *testing.T) {
 	dbPath := "/tmp/test_requests_getall.db"
-	defer os.Remove(dbPath)
+	defer func() {
+		if err := os.Remove(dbPath); err != nil {
+			// Ignore remove errors in test cleanup
+		}
+	}()
 
 	db, err := New(dbPath)
 	if err != nil {
 		t.Fatalf("Failed to create database: %v", err)
 	}
-	defer db.Close()
+	defer func() {
+		if err := db.Close(); err != nil {
+			// Ignore close errors in test cleanup
+		}
+	}()
 
 	// Log multiple requests
 	for i := 0; i < 5; i++ {
@@ -218,13 +236,21 @@ func TestGetAllLogs(t *testing.T) {
 
 func TestGetEndpointStats(t *testing.T) {
 	dbPath := "/tmp/test_requests_endpoint_stats.db"
-	defer os.Remove(dbPath)
+	defer func() {
+		if err := os.Remove(dbPath); err != nil {
+			// Ignore remove errors in test cleanup
+		}
+	}()
 
 	db, err := New(dbPath)
 	if err != nil {
 		t.Fatalf("Failed to create database: %v", err)
 	}
-	defer db.Close()
+	defer func() {
+		if err := db.Close(); err != nil {
+			// Ignore close errors in test cleanup
+		}
+	}()
 
 	// Log requests from multiple IPs to different endpoints
 	testData := []struct {
@@ -287,13 +313,21 @@ func TestGetEndpointStats(t *testing.T) {
 
 func TestGetSourceStats(t *testing.T) {
 	dbPath := "/tmp/test_requests_source_stats.db"
-	defer os.Remove(dbPath)
+	defer func() {
+		if err := os.Remove(dbPath); err != nil {
+			// Ignore remove errors in test cleanup
+		}
+	}()
 
 	db, err := New(dbPath)
 	if err != nil {
 		t.Fatalf("Failed to create database: %v", err)
 	}
-	defer db.Close()
+	defer func() {
+		if err := db.Close(); err != nil {
+			// Ignore close errors in test cleanup
+		}
+	}()
 
 	// Log requests from multiple IPs to different endpoints
 	testData := []struct {
@@ -356,13 +390,21 @@ func TestGetSourceStats(t *testing.T) {
 
 func TestGetSummary(t *testing.T) {
 	dbPath := "/tmp/test_requests_summary.db"
-	defer os.Remove(dbPath)
+	defer func() {
+		if err := os.Remove(dbPath); err != nil {
+			// Ignore remove errors in test cleanup
+		}
+	}()
 
 	db, err := New(dbPath)
 	if err != nil {
 		t.Fatalf("Failed to create database: %v", err)
 	}
-	defer db.Close()
+	defer func() {
+		if err := db.Close(); err != nil {
+			// Ignore close errors in test cleanup
+		}
+	}()
 
 	// Log requests from multiple IPs to different endpoints
 	testData := []struct {
@@ -463,13 +505,21 @@ func TestNew_InvalidPath(t *testing.T) {
 
 func TestGetEndpointStats_EmptyDatabase(t *testing.T) {
 	dbPath := "/tmp/test_requests_empty_endpoint.db"
-	defer os.Remove(dbPath)
+	defer func() {
+		if err := os.Remove(dbPath); err != nil {
+			// Ignore remove errors in test cleanup
+		}
+	}()
 
 	db, err := New(dbPath)
 	if err != nil {
 		t.Fatalf("Failed to create database: %v", err)
 	}
-	defer db.Close()
+	defer func() {
+		if err := db.Close(); err != nil {
+			// Ignore close errors in test cleanup
+		}
+	}()
 
 	stats, err := db.GetEndpointStats()
 	if err != nil {
@@ -483,13 +533,21 @@ func TestGetEndpointStats_EmptyDatabase(t *testing.T) {
 
 func TestGetSourceStats_EmptyDatabase(t *testing.T) {
 	dbPath := "/tmp/test_requests_empty_source.db"
-	defer os.Remove(dbPath)
+	defer func() {
+		if err := os.Remove(dbPath); err != nil {
+			// Ignore remove errors in test cleanup
+		}
+	}()
 
 	db, err := New(dbPath)
 	if err != nil {
 		t.Fatalf("Failed to create database: %v", err)
 	}
-	defer db.Close()
+	defer func() {
+		if err := db.Close(); err != nil {
+			// Ignore close errors in test cleanup
+		}
+	}()
 
 	stats, err := db.GetSourceStats()
 	if err != nil {
@@ -503,13 +561,21 @@ func TestGetSourceStats_EmptyDatabase(t *testing.T) {
 
 func TestGetSummary_EmptyDatabase(t *testing.T) {
 	dbPath := "/tmp/test_requests_empty_summary.db"
-	defer os.Remove(dbPath)
+	defer func() {
+		if err := os.Remove(dbPath); err != nil {
+			// Ignore remove errors in test cleanup
+		}
+	}()
 
 	db, err := New(dbPath)
 	if err != nil {
 		t.Fatalf("Failed to create database: %v", err)
 	}
-	defer db.Close()
+	defer func() {
+		if err := db.Close(); err != nil {
+			// Ignore close errors in test cleanup
+		}
+	}()
 
 	summary, err := db.GetSummary()
 	if err != nil {
