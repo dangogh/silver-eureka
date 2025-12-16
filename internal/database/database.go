@@ -115,20 +115,30 @@ func (db *DB) initSchema() error {
 }
 
 // LogRequest logs an HTTP request to the database with retry logic
-func (db *DB) LogRequest(ipAddress, url string) error {
-	query := `INSERT INTO request_logs (ip_address, url, timestamp) VALUES (?, ?, ?)`
+func (db *DB) LogRequest(ipAddress, url string) error { // Sanitize inputs to prevent log injection and data issues
+	ipAddress = sanitizeInput(ipAddress, 45) // Max IPv6 length
+	url = sanitizeInput(url, 2048)           // Max URL length
 
-	// Retry with exponential backoff for database lock contention
+	// Execute with retry logic
+	return db.executeWithRetry(func() error {
+		query := `INSERT INTO request_logs (ip_address, url, timestamp) VALUES (?, ?, ?)`
+		_, err := db.conn.Exec(query, ipAddress, url, time.Now())
+		return err
+	})
+}
+
+// executeWithRetry executes a database operation with exponential backoff retry logic
+func (db *DB) executeWithRetry(operation func() error) error {
 	maxRetries := 3
 	for attempt := 0; attempt <= maxRetries; attempt++ {
-		_, err := db.conn.Exec(query, ipAddress, url, time.Now())
+		err := operation()
 		if err == nil {
 			return nil
 		}
 
 		// Check if it's a retryable error (database locked)
 		if !isRetryableError(err) {
-			return fmt.Errorf("failed to log request: %w", err)
+			return fmt.Errorf("failed to execute operation: %w", err)
 		}
 
 		// Don't sleep on the last attempt
@@ -139,7 +149,7 @@ func (db *DB) LogRequest(ipAddress, url string) error {
 		}
 	}
 
-	return fmt.Errorf("failed to log request after %d retries", maxRetries)
+	return fmt.Errorf("failed to execute operation after %d retries", maxRetries)
 }
 
 // isRetryableError checks if an error is retryable (e.g., database locked)
@@ -151,6 +161,25 @@ func isRetryableError(err error) bool {
 	return strings.Contains(errStr, "database is locked") ||
 		strings.Contains(errStr, "database table is locked") ||
 		strings.Contains(errStr, "SQLITE_BUSY")
+}
+
+// sanitizeInput removes control characters and enforces length limits
+// to prevent log injection and data integrity issues
+func sanitizeInput(input string, maxLen int) string {
+	// Remove control characters (0x00-0x1F and 0x7F)
+	sanitized := strings.Map(func(r rune) rune {
+		if r < 0x20 || r == 0x7F {
+			return -1 // Drop the character
+		}
+		return r
+	}, input)
+
+	// Enforce maximum length
+	if len(sanitized) > maxLen {
+		sanitized = sanitized[:maxLen]
+	}
+
+	return sanitized
 }
 
 // GetLogs retrieves request logs with optional limit

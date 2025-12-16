@@ -1,11 +1,34 @@
 package database
 
 import (
+	"errors"
 	"fmt"
 	"os"
+	"strings"
 	"testing"
 	"time"
+
+	"github.com/mattn/go-sqlite3"
 )
+
+// setupTestDB creates a temporary test database
+func setupTestDB(t *testing.T) *DB {
+	t.Helper()
+	dbPath := fmt.Sprintf("/tmp/test_db_%d.db", time.Now().UnixNano())
+	t.Cleanup(func() {
+		_ = os.Remove(dbPath) //nolint:errcheck // Cleanup code
+	})
+
+	db, err := New(dbPath)
+	if err != nil {
+		t.Fatalf("Failed to create test database: %v", err)
+	}
+	t.Cleanup(func() {
+		_ = db.Close() //nolint:errcheck // Cleanup code
+	})
+
+	return db
+}
 
 func TestNew(t *testing.T) {
 	// Use temporary database file
@@ -590,5 +613,310 @@ func TestGetSummary_EmptyDatabase(t *testing.T) {
 	}
 	if summary.UniqueURLs != 0 {
 		t.Errorf("Expected 0 unique URLs, got %d", summary.UniqueURLs)
+	}
+}
+
+func TestSanitizeInput(t *testing.T) {
+	tests := []struct {
+		name   string
+		input  string
+		maxLen int
+		want   string
+	}{
+		{
+			name:   "normal input",
+			input:  "192.168.1.1",
+			maxLen: 50,
+			want:   "192.168.1.1",
+		},
+		{
+			name:   "input with newline",
+			input:  "test\nvalue",
+			maxLen: 50,
+			want:   "testvalue",
+		},
+		{
+			name:   "input with carriage return",
+			input:  "test\rvalue",
+			maxLen: 50,
+			want:   "testvalue",
+		},
+		{
+			name:   "input with null byte",
+			input:  "test\x00value",
+			maxLen: 50,
+			want:   "testvalue",
+		},
+		{
+			name:   "input with tab",
+			input:  "test\tvalue",
+			maxLen: 50,
+			want:   "testvalue",
+		},
+		{
+			name:   "input exceeds max length",
+			input:  "very long string that exceeds the maximum allowed length",
+			maxLen: 10,
+			want:   "very long ",
+		},
+		{
+			name:   "URL with control chars",
+			input:  "/api/test\n\r\x00?param=value",
+			maxLen: 100,
+			want:   "/api/test?param=value",
+		},
+		{
+			name:   "empty input",
+			input:  "",
+			maxLen: 50,
+			want:   "",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := sanitizeInput(tt.input, tt.maxLen)
+			if got != tt.want {
+				t.Errorf("sanitizeInput(%q, %d) = %q, want %q", tt.input, tt.maxLen, got, tt.want)
+			}
+		})
+	}
+}
+
+func TestLogRequest_WithControlCharacters(t *testing.T) {
+	dbPath := "/tmp/test_requests_sanitize.db"
+	defer func() {
+		if err := os.Remove(dbPath); err != nil {
+			// Ignore remove errors in test cleanup
+		}
+	}()
+
+	db, err := New(dbPath)
+	if err != nil {
+		t.Fatalf("Failed to create database: %v", err)
+	}
+	defer func() {
+		if err := db.Close(); err != nil {
+			// Ignore close errors in test cleanup
+		}
+	}()
+
+	// Log request with control characters
+	maliciousURL := "/test\n\r\x00path"
+	maliciousIP := "192.168\n.1.1"
+
+	if err := db.LogRequest(maliciousIP, maliciousURL); err != nil {
+		t.Errorf("LogRequest failed: %v", err)
+	}
+
+	// Verify the log was sanitized
+	logs, err := db.GetLogs(1)
+	if err != nil {
+		t.Fatalf("Failed to get logs: %v", err)
+	}
+
+	if len(logs) != 1 {
+		t.Fatalf("Expected 1 log entry, got %d", len(logs))
+	}
+
+	// Should have control characters stripped
+	if strings.Contains(logs[0].IPAddress, "\n") || strings.Contains(logs[0].IPAddress, "\r") {
+		t.Errorf("IP address still contains control characters: %q", logs[0].IPAddress)
+	}
+
+	if strings.Contains(logs[0].URL, "\n") || strings.Contains(logs[0].URL, "\r") || strings.Contains(logs[0].URL, "\x00") {
+		t.Errorf("URL still contains control characters: %q", logs[0].URL)
+	}
+
+	// Verify sanitized values
+	expectedIP := "192.168.1.1"
+	expectedURL := "/testpath"
+
+	if logs[0].IPAddress != expectedIP {
+		t.Errorf("IP address = %q, want %q", logs[0].IPAddress, expectedIP)
+	}
+
+	if logs[0].URL != expectedURL {
+		t.Errorf("URL = %q, want %q", logs[0].URL, expectedURL)
+	}
+}
+
+func TestLogRequest_LongInputs(t *testing.T) {
+	dbPath := "/tmp/test_requests_long.db"
+	defer func() {
+		if err := os.Remove(dbPath); err != nil {
+			// Ignore remove errors in test cleanup
+		}
+	}()
+
+	db, err := New(dbPath)
+	if err != nil {
+		t.Fatalf("Failed to create database: %v", err)
+	}
+	defer func() {
+		if err := db.Close(); err != nil {
+			// Ignore close errors in test cleanup
+		}
+	}()
+
+	// Test with very long IP (should be truncated to 45 chars)
+	longIP := strings.Repeat("1234567890", 10) // 100 chars
+	normalURL := "/test"
+
+	if err := db.LogRequest(longIP, normalURL); err != nil {
+		t.Errorf("LogRequest failed: %v", err)
+	}
+
+	// Test with very long URL (should be truncated to 2048 chars)
+	normalIP := "192.168.1.1"
+	longURL := "/" + strings.Repeat("abcdefghij", 300) // >2048 chars
+
+	if err := db.LogRequest(normalIP, longURL); err != nil {
+		t.Errorf("LogRequest failed: %v", err)
+	}
+
+	// Verify truncation occurred
+	logs, err := db.GetLogs(10)
+	if err != nil {
+		t.Fatalf("Failed to get logs: %v", err)
+	}
+
+	if len(logs) != 2 {
+		t.Fatalf("Expected 2 log entries, got %d", len(logs))
+	}
+
+	// Check IP was truncated
+	for _, log := range logs {
+		if len(log.IPAddress) > 45 {
+			t.Errorf("IP address too long: %d chars (max 45)", len(log.IPAddress))
+		}
+		if len(log.URL) > 2048 {
+			t.Errorf("URL too long: %d chars (max 2048)", len(log.URL))
+		}
+	}
+}
+
+func TestLogRequest_EmptyInputs(t *testing.T) {
+	dbPath := "/tmp/test_requests_empty.db"
+	defer func() {
+		if err := os.Remove(dbPath); err != nil {
+			// Ignore remove errors in test cleanup
+		}
+	}()
+
+	db, err := New(dbPath)
+	if err != nil {
+		t.Fatalf("Failed to create database: %v", err)
+	}
+	defer func() {
+		if err := db.Close(); err != nil {
+			// Ignore close errors in test cleanup
+		}
+	}()
+
+	// Test with empty strings
+	if err := db.LogRequest("", ""); err != nil {
+		t.Errorf("LogRequest with empty inputs failed: %v", err)
+	}
+
+	// Verify the log was created
+	logs, err := db.GetLogs(1)
+	if err != nil {
+		t.Fatalf("Failed to get logs: %v", err)
+	}
+
+	if len(logs) != 1 {
+		t.Fatalf("Expected 1 log entry, got %d", len(logs))
+	}
+
+	if logs[0].IPAddress != "" {
+		t.Errorf("Expected empty IP, got %q", logs[0].IPAddress)
+	}
+
+	if logs[0].URL != "" {
+		t.Errorf("Expected empty URL, got %q", logs[0].URL)
+	}
+}
+
+func TestExecuteWithRetry_Success(t *testing.T) {
+	db := setupTestDB(t)
+
+	// Operation succeeds on first try
+	callCount := 0
+	err := db.executeWithRetry(func() error {
+		callCount++
+		return nil
+	})
+
+	if err != nil {
+		t.Fatalf("expected no error, got: %v", err)
+	}
+	if callCount != 1 {
+		t.Fatalf("expected operation to be called once, got: %d", callCount)
+	}
+}
+
+func TestExecuteWithRetry_NonRetryableError(t *testing.T) {
+	db := setupTestDB(t)
+
+	// Non-retryable error should fail immediately
+	callCount := 0
+	expectedErr := errors.New("non-retryable error")
+	err := db.executeWithRetry(func() error {
+		callCount++
+		return expectedErr
+	})
+
+	if err == nil {
+		t.Fatal("expected error, got nil")
+	}
+	if !strings.Contains(err.Error(), "failed to execute operation") {
+		t.Fatalf("expected 'failed to execute operation' error, got: %v", err)
+	}
+	if callCount != 1 {
+		t.Fatalf("expected operation to be called once for non-retryable error, got: %d", callCount)
+	}
+}
+
+func TestExecuteWithRetry_SuccessAfterRetries(t *testing.T) {
+	db := setupTestDB(t)
+
+	// Operation succeeds on third try (simulate database busy)
+	callCount := 0
+	err := db.executeWithRetry(func() error {
+		callCount++
+		if callCount < 3 {
+			return sqlite3.Error{Code: sqlite3.ErrBusy}
+		}
+		return nil
+	})
+
+	if err != nil {
+		t.Fatalf("expected no error after retries, got: %v", err)
+	}
+	if callCount != 3 {
+		t.Fatalf("expected operation to be called 3 times, got: %d", callCount)
+	}
+}
+
+func TestExecuteWithRetry_ExhaustedRetries(t *testing.T) {
+	db := setupTestDB(t)
+
+	// Operation fails all attempts
+	callCount := 0
+	err := db.executeWithRetry(func() error {
+		callCount++
+		return sqlite3.Error{Code: sqlite3.ErrBusy}
+	})
+
+	if err == nil {
+		t.Fatal("expected error after exhausted retries, got nil")
+	}
+	if !strings.Contains(err.Error(), "failed to execute operation after") {
+		t.Fatalf("expected 'failed after retries' error, got: %v", err)
+	}
+	// Should be called 4 times total (initial + 3 retries)
+	if callCount != 4 {
+		t.Fatalf("expected operation to be called 4 times (initial + 3 retries), got: %d", callCount)
 	}
 }
