@@ -31,7 +31,7 @@ func TestHealthEndpoint_Healthy(t *testing.T) {
 		}
 	}()
 
-	router := New(db, "", "")
+	router := NewWithRateLimiter(db, "", "", false)
 
 	req := httptest.NewRequest(http.MethodGet, "/health", nil)
 	rec := httptest.NewRecorder()
@@ -67,7 +67,7 @@ func TestHealthEndpoint_Unhealthy(t *testing.T) {
 		t.Logf("Close error (expected): %v", err)
 	}
 
-	router := New(db, "", "")
+	router := NewWithRateLimiter(db, "", "", false)
 
 	req := httptest.NewRequest(http.MethodGet, "/health", nil)
 	rec := httptest.NewRecorder()
@@ -105,7 +105,7 @@ func TestStatsEndpointsRegistered(t *testing.T) {
 		t.Fatalf("Failed to log request: %v", err)
 	}
 
-	router := New(db, "", "")
+	router := NewWithRateLimiter(db, "", "", false)
 
 	tests := []struct {
 		name     string
@@ -145,7 +145,7 @@ func TestDefaultHandlerLogsRequests(t *testing.T) {
 		}
 	}()
 
-	router := New(db, "", "")
+	router := NewWithRateLimiter(db, "", "", false)
 
 	devNull, err := os.Open(os.DevNull)
 	if err != nil {
@@ -192,7 +192,7 @@ func TestRouterHandlesMultipleRequests(t *testing.T) {
 		}
 	}()
 
-	router := New(db, "", "")
+	router := NewWithRateLimiter(db, "", "", false)
 
 	devNull, err := os.Open(os.DevNull)
 	if err != nil {
@@ -244,7 +244,7 @@ func TestBasicAuthProtectsStatsEndpoints(t *testing.T) {
 	}
 
 	// Create router with auth enabled
-	router := New(db, "admin", "secret123")
+	router := NewWithRateLimiter(db, "admin", "secret123", false)
 
 	t.Run("stats endpoints require auth", func(t *testing.T) {
 		endpoints := []string{"/stats/summary", "/stats/endpoints", "/stats/sources", "/stats/download"}

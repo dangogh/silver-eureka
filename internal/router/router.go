@@ -13,6 +13,11 @@ import (
 
 // New creates a new HTTP router with all application routes
 func New(db *database.DB, authUsername, authPassword string) http.Handler {
+	return NewWithRateLimiter(db, authUsername, authPassword, true)
+}
+
+// NewWithRateLimiter creates a new HTTP router with optional rate limiting
+func NewWithRateLimiter(db *database.DB, authUsername, authPassword string, enableRateLimit bool) http.Handler {
 	mux := http.NewServeMux()
 
 	// Health check endpoint (public, no auth)
@@ -39,6 +44,13 @@ func New(db *database.DB, authUsername, authPassword string) http.Handler {
 	// Default handler for all other requests (logs them, returns 404)
 	logHandler := handler.New(db)
 	mux.Handle("/", logHandler)
+
+	// Apply rate limiting to all routes if enabled
+	if enableRateLimit {
+		// Initialize rate limiter: 100 req/min per IP, 10,000 req/min global
+		rateLimiter := middleware.NewRateLimiter(100, 10000)
+		return rateLimiter.Middleware()(mux)
+	}
 
 	return mux
 }
