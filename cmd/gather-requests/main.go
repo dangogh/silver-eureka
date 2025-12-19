@@ -62,6 +62,13 @@ func run() error {
 		slog.Warn("HTTP Basic Auth not configured - stats endpoints are public")
 	}
 
+	// Log retention status
+	if cfg.LogRetentionDays > 0 {
+		slog.Info("Log retention enabled", "retention_days", cfg.LogRetentionDays)
+	} else {
+		slog.Info("Log retention disabled - logs will be kept indefinitely")
+	}
+
 	// Create HTTP router with all endpoints
 	h := router.New(db, cfg.AuthUsername, cfg.AuthPassword)
 
@@ -84,6 +91,33 @@ func run() error {
 		slog.Info("HTTP server starting", "port", cfg.Port)
 		serverErrors <- server.ListenAndServe()
 	}()
+
+	// Start background log cleanup goroutine if retention is enabled
+	if cfg.LogRetentionDays > 0 {
+		go func() {
+			// Run cleanup immediately on startup
+			if deleted, err := db.CleanupOldLogs(cfg.LogRetentionDays); err != nil {
+				slog.Error("Failed to cleanup old logs on startup", "error", err)
+			} else if deleted > 0 {
+				slog.Info("Cleaned up old logs on startup", "deleted", deleted)
+			}
+
+			// Then run daily
+			ticker := time.NewTicker(24 * time.Hour)
+			defer ticker.Stop()
+
+			for range ticker.C {
+				deleted, err := db.CleanupOldLogs(cfg.LogRetentionDays)
+				if err != nil {
+					slog.Error("Failed to cleanup old logs", "error", err)
+				} else if deleted > 0 {
+					slog.Info("Cleaned up old logs", "deleted", deleted, "retention_days", cfg.LogRetentionDays)
+				} else {
+					slog.Debug("Log cleanup ran, no old logs found")
+				}
+			}
+		}()
+	}
 
 	// Channel to listen for interrupt or terminate signals
 	shutdown := make(chan os.Signal, 1)

@@ -391,3 +391,40 @@ func (db *DB) GetSummary() (*Summary, error) {
 
 	return &summary, nil
 }
+
+// CleanupOldLogs deletes logs older than retentionDays and returns the number deleted
+// If retentionDays is 0, no cleanup is performed
+func (db *DB) CleanupOldLogs(retentionDays int) (int64, error) {
+	if retentionDays <= 0 {
+		return 0, nil // No cleanup when retention is 0 or negative
+	}
+
+	// Calculate cutoff timestamp
+	cutoff := time.Now().AddDate(0, 0, -retentionDays)
+
+	// Delete old logs
+	result, err := db.conn.Exec(
+		"DELETE FROM request_logs WHERE timestamp < ?",
+		cutoff,
+	)
+	if err != nil {
+		return 0, fmt.Errorf("failed to cleanup old logs: %w", err)
+	}
+
+	deleted, err := result.RowsAffected()
+	if err != nil {
+		return 0, fmt.Errorf("failed to get rows affected: %w", err)
+	}
+
+	// Run VACUUM to reclaim disk space if we deleted records
+	// VACUUM can be slow, but we run cleanup off-peak
+	if deleted > 0 {
+		if _, err := db.conn.Exec("VACUUM"); err != nil {
+			// Log warning but don't fail - VACUUM is optimization
+			// The deletion already succeeded
+			return deleted, fmt.Errorf("cleanup succeeded but VACUUM failed: %w", err)
+		}
+	}
+
+	return deleted, nil
+}

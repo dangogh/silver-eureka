@@ -920,3 +920,191 @@ func TestExecuteWithRetry_ExhaustedRetries(t *testing.T) {
 		t.Fatalf("expected operation to be called 4 times (initial + 3 retries), got: %d", callCount)
 	}
 }
+
+func TestCleanupOldLogs_NoRetention(t *testing.T) {
+	db := setupTestDB(t)
+
+	// With retention = 0, no cleanup should occur
+	deleted, err := db.CleanupOldLogs(0)
+	if err != nil {
+		t.Fatalf("expected no error with retention=0, got: %v", err)
+	}
+	if deleted != 0 {
+		t.Errorf("expected 0 deleted with retention=0, got: %d", deleted)
+	}
+
+	// Negative retention should also do nothing
+	deleted, err = db.CleanupOldLogs(-1)
+	if err != nil {
+		t.Fatalf("expected no error with retention=-1, got: %v", err)
+	}
+	if deleted != 0 {
+		t.Errorf("expected 0 deleted with retention=-1, got: %d", deleted)
+	}
+}
+
+func TestCleanupOldLogs_DeletesOldRecords(t *testing.T) {
+	db := setupTestDB(t)
+
+	// Insert logs with different timestamps
+	now := time.Now()
+
+	// Old logs (40 days ago)
+	oldTime := now.AddDate(0, 0, -40)
+	_, err := db.conn.Exec(
+		"INSERT INTO request_logs (ip_address, url, timestamp) VALUES (?, ?, ?)",
+		"192.0.2.1", "/old1", oldTime,
+	)
+	if err != nil {
+		t.Fatalf("Failed to insert old log: %v", err)
+	}
+
+	_, err = db.conn.Exec(
+		"INSERT INTO request_logs (ip_address, url, timestamp) VALUES (?, ?, ?)",
+		"192.0.2.2", "/old2", oldTime.Add(time.Hour),
+	)
+	if err != nil {
+		t.Fatalf("Failed to insert old log: %v", err)
+	}
+
+	// Recent logs (10 days ago)
+	recentTime := now.AddDate(0, 0, -10)
+	_, err = db.conn.Exec(
+		"INSERT INTO request_logs (ip_address, url, timestamp) VALUES (?, ?, ?)",
+		"192.0.2.3", "/recent1", recentTime,
+	)
+	if err != nil {
+		t.Fatalf("Failed to insert recent log: %v", err)
+	}
+
+	// Very recent (1 day ago)
+	veryRecentTime := now.AddDate(0, 0, -1)
+	_, err = db.conn.Exec(
+		"INSERT INTO request_logs (ip_address, url, timestamp) VALUES (?, ?, ?)",
+		"192.0.2.4", "/recent2", veryRecentTime,
+	)
+	if err != nil {
+		t.Fatalf("Failed to insert very recent log: %v", err)
+	}
+
+	// Cleanup logs older than 30 days
+	deleted, err := db.CleanupOldLogs(30)
+	if err != nil {
+		t.Fatalf("Failed to cleanup old logs: %v", err)
+	}
+
+	// Should have deleted 2 old logs
+	if deleted != 2 {
+		t.Errorf("Expected 2 deleted logs, got: %d", deleted)
+	}
+
+	// Verify remaining logs
+	var count int
+	err = db.conn.QueryRow("SELECT COUNT(*) FROM request_logs").Scan(&count)
+	if err != nil {
+		t.Fatalf("Failed to count remaining logs: %v", err)
+	}
+
+	if count != 2 {
+		t.Errorf("Expected 2 remaining logs, got: %d", count)
+	}
+
+	// Verify the correct logs remain (recent ones)
+	logs, err := db.GetLogs(10)
+	if err != nil {
+		t.Fatalf("Failed to get logs: %v", err)
+	}
+
+	if len(logs) != 2 {
+		t.Fatalf("Expected 2 logs, got: %d", len(logs))
+	}
+
+	// Check that recent logs are present (order is DESC by timestamp)
+	if logs[0].URL != "/recent2" {
+		t.Errorf("Expected first log URL to be /recent2, got: %s", logs[0].URL)
+	}
+	if logs[1].URL != "/recent1" {
+		t.Errorf("Expected second log URL to be /recent1, got: %s", logs[1].URL)
+	}
+}
+
+func TestCleanupOldLogs_NoOldRecords(t *testing.T) {
+	db := setupTestDB(t)
+
+	// Insert only recent logs
+	now := time.Now()
+	recentTime := now.AddDate(0, 0, -5)
+
+	if err := db.LogRequest("192.0.2.1", "/test1"); err != nil {
+		t.Fatalf("Failed to log request: %v", err)
+	}
+
+	// Manually update timestamp to be 5 days old
+	_, err := db.conn.Exec(
+		"UPDATE request_logs SET timestamp = ?",
+		recentTime,
+	)
+	if err != nil {
+		t.Fatalf("Failed to update timestamp: %v", err)
+	}
+
+	// Cleanup with 30 day retention
+	deleted, err := db.CleanupOldLogs(30)
+	if err != nil {
+		t.Fatalf("Failed to cleanup: %v", err)
+	}
+
+	// Should have deleted 0 records
+	if deleted != 0 {
+		t.Errorf("Expected 0 deleted logs (all are recent), got: %d", deleted)
+	}
+
+	// Verify log still exists
+	logs, err := db.GetLogs(10)
+	if err != nil {
+		t.Fatalf("Failed to get logs: %v", err)
+	}
+
+	if len(logs) != 1 {
+		t.Errorf("Expected 1 remaining log, got: %d", len(logs))
+	}
+}
+
+func TestCleanupOldLogs_AllOldRecords(t *testing.T) {
+	db := setupTestDB(t)
+
+	// Insert only old logs
+	now := time.Now()
+	oldTime := now.AddDate(0, 0, -60)
+
+	for i := 0; i < 5; i++ {
+		_, err := db.conn.Exec(
+			"INSERT INTO request_logs (ip_address, url, timestamp) VALUES (?, ?, ?)",
+			"192.0.2.1", fmt.Sprintf("/old%d", i), oldTime.Add(time.Duration(i)*time.Hour),
+		)
+		if err != nil {
+			t.Fatalf("Failed to insert old log: %v", err)
+		}
+	}
+
+	// Cleanup with 30 day retention
+	deleted, err := db.CleanupOldLogs(30)
+	if err != nil {
+		t.Fatalf("Failed to cleanup: %v", err)
+	}
+
+	// Should have deleted all 5 records
+	if deleted != 5 {
+		t.Errorf("Expected 5 deleted logs, got: %d", deleted)
+	}
+
+	// Verify no logs remain
+	logs, err := db.GetLogs(10)
+	if err != nil {
+		t.Fatalf("Failed to get logs: %v", err)
+	}
+
+	if len(logs) != 0 {
+		t.Errorf("Expected 0 remaining logs, got: %d", len(logs))
+	}
+}

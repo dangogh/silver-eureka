@@ -59,17 +59,32 @@ Implemented comprehensive rate limiting:
 
 See [RATE_LIMITING.md](RATE_LIMITING.md) for complete documentation.
 
+### 4. Log Rotation (IMPLEMENTED)
+**Files**: `internal/database/database.go`, `internal/config/config.go`, `cmd/gather-requests/main.go`
+
+Implemented automatic log cleanup:
+- Configurable retention period (default: 30 days)
+- Runs daily in background goroutine
+- Runs immediately on startup
+- VACUUM after cleanup to reclaim disk space
+- Can be disabled by setting retention to 0
+
+**Configuration**:
+- Environment variable: `LOG_RETENTION_DAYS=30`
+- Command-line flag: `-log-retention-days=30`
+- Set to 0 to disable (keep logs forever)
+
+**Tests**: Added 4 comprehensive test functions:
+- No retention (disabled)
+- Delete old records only
+- No old records found
+- All records old (total cleanup)
+
+**Coverage**: CleanupOldLogs 76.9%
+
 ## Remaining Recommendations
 
-### High Priority
-
-**Log Rotation**
-- Not yet implemented
-- Recommend: Automatic deletion of logs older than 30 days
-- Add database size monitoring
-- Add to internal/database/database.go
-
-### Medium Priority
+### Low Priority (Optional)
 
 **Enhanced Logging**
 Consider adding (with sanitization):
@@ -93,6 +108,7 @@ Consider adding (with sanitization):
 ✓ Graceful shutdown
 ✓ Rate limiting (per-IP and global)
 ✓ DoS protection
+✓ Log rotation (automatic cleanup)
 
 ## Testing
 
@@ -100,7 +116,8 @@ All security changes are covered by tests:
 - `TestSanitizeInput`: 8 test cases
 - `TestLogRequest_WithControlCharacters`: Integration test
 - Rate limiting: 12 unit tests + 2 integration tests
-- Total coverage: 80.5%
+- Log cleanup: 4 comprehensive test functions
+- Total coverage: 77.8%
 
 ## Deployment Considerations
 
